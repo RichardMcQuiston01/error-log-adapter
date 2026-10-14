@@ -15,3 +15,15 @@ export type {
   MongoDbErrorOptions,
 } from './adapters/mongodb-error-adapter.js';
 export { CompositeErrorAdapter } from './adapters/composite-error-adapter.js';
+export {
+  IndexedDbErrorAdapter,
+  createErrorLogStore,
+} from './adapters/indexeddb-error-adapter.js';
+export type {
+  IdbDatabaseLike,
+  IdbObjectStoreLike,
+  IdbTransactionLike,
+  IdbUpgradeDatabaseLike,
+  IndexedDbErrorOptions,
+  IndexedDbErrorRecord,
+} from './adapters/indexeddb-error-adapter.js';

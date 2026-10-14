@@ -16,61 +16,57 @@ Planned adapters, in priority order.
 - Webhook
 - MongoDB
 - Composite (fan-out to several adapters)
+- IndexedDB
 
 ## Next Up
 
-### 1. IndexedDB (browser)
-
-- Store entries in an object store, using a UUID key and an index on `timestamp`.
-- Accept an `IDBDatabase`-like structural type.
-
-### 2. SQLite
+### 1. SQLite
 
 - Insert into an `error_log` table.
 - Accept a minimal `run(sql, params)` style client so it works with `better-sqlite3`, `bun:sqlite`, and similar drivers.
 - Optionally create the table on first use.
 
-### 3. sessionStorage (browser)
+### 2. sessionStorage (browser)
 
 - Append entries under a configurable key.
 - Cap the number of stored entries (ring buffer) and handle `QuotaExceededError`.
 - Accept a `Storage`-like object so it can also wrap `localStorage`.
 
-### 4. Flat file (Node/Bun)
+### 3. Flat file (Node/Bun)
 
 - Append one line per entry to a text file.
 - Options: path, line format, optional size-based rotation.
 
-### 5. JSON file (Node/Bun)
+### 4. JSON file (Node/Bun)
 
 - Append entries as newline-delimited JSON (NDJSON), which is cheap to append and easy to parse.
 - Optional single-array JSON mode, rewritten on each write.
 
-### 6. MySQL / Postgres
+### 5. MySQL / Postgres
 
 - Shared SQL core with per-dialect placeholder handling (`?` vs `$1`).
 - Accept a minimal `query(sql, params)` client, so it works with `pg`, `mysql2`, and similar drivers.
 - Use native UUID types where the database supports them, and a JSON column for `cause`.
 - Provide DDL snippets for `error_log`.
 
-### 7. Redis
+### 6. Redis
 
 - Push JSON entries onto a list (`LPUSH` or `RPUSH`) with optional `LTRIM` to cap length.
 - Optional Streams (`XADD`) mode.
 
-### 8. S3 / DigitalOcean Spaces
+### 7. S3 / DigitalOcean Spaces
 
 - Write one object per entry, or batched objects, keyed by date and UUID.
 - Accept a minimal `putObject` client, since Spaces uses the S3 API.
 - Support a configurable prefix and content type.
 
-### 9. Firebase
+### 8. Firebase
 
 - Firestore: add a document to an `error_log` collection.
 - Optional Realtime Database support.
 - Accept a collection-like structural type.
 
-### 10. Webhook improvements
+### 9. Webhook improvements
 
 The base adapter is already shipped. Remaining work:
 
@@ -79,20 +75,20 @@ The base adapter is already shipped. Remaining work:
 - Optional batching.
 - Optional HMAC signature header.
 
-### 11. AWS CloudWatch Logs
+### 10. AWS CloudWatch Logs
 
 - Use `PutLogEvents` through an injected client.
 - Worth it for apps running outside managed AWS runtimes (Lambda and ECS already ship stdout to CloudWatch).
 - Scope: one log group/stream per adapter instance; handle sequence tokens and the batch size limit.
 - SNS publishing could share the same client pattern later.
 
-### 12. Event Emitter
+### 11. Event Emitter
 
 - Emit each entry as an event on a user-supplied emitter (anything with `emit(name, payload)`).
 - Cheap to build and useful for in-process hooks: UI toasts, metrics counters, and test assertions.
 - Scope: no dependencies, and it works with Node `EventEmitter`, `EventTarget` wrappers, and mitt-style emitters.
 
-### 13. WebSocket
+### 12. WebSocket
 
 - Send JSON entries over a caller-owned socket (anything with `send` and `readyState`).
 - Lowest priority; keep it thin. The caller owns connect and reconnect.

@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## Unreleased
+
+- `IndexedDbErrorAdapter` for browser storage, plus a `createErrorLogStore` helper for `onupgradeneeded`. Records get a UUID `id` key and a `timestamp` index.
+
 ## 0.1.0
 
 - Initial release, extracted from [chat-and-react](https://github.com/RichardMcQuiston01/chat-and-react).
