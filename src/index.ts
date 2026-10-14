@@ -45,7 +45,10 @@ export {
   FlatFileErrorAdapter,
   formatErrorLogLine,
 } from './adapters/flat-file-error-adapter.js';
+export type { FlatFileErrorOptions } from './adapters/flat-file-error-adapter.js';
+export type { FileSystemLike, ReadWriteFileSystemLike } from './file-system.js';
+export { JsonFileErrorAdapter } from './adapters/json-file-error-adapter.js';
 export type {
-  FileSystemLike,
-  FlatFileErrorOptions,
-} from './adapters/flat-file-error-adapter.js';
+  JsonFileErrorOptions,
+  JsonFileErrorRecord,
+} from './adapters/json-file-error-adapter.js';
