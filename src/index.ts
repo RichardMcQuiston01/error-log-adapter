@@ -27,3 +27,11 @@ export type {
   IndexedDbErrorOptions,
   IndexedDbErrorRecord,
 } from './adapters/indexeddb-error-adapter.js';
+export {
+  SqliteErrorAdapter,
+  buildCreateErrorLogTableSql,
+} from './adapters/sqlite-error-adapter.js';
+export type {
+  SqliteClientLike,
+  SqliteErrorOptions,
+} from './adapters/sqlite-error-adapter.js';
