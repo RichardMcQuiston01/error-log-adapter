@@ -62,3 +62,8 @@ export type {
   SqlDialect,
   SqlErrorOptions,
 } from './adapters/sql-error-adapter.js';
+export { RedisErrorAdapter } from './adapters/redis-error-adapter.js';
+export type {
+  RedisClientLike,
+  RedisErrorOptions,
+} from './adapters/redis-error-adapter.js';
