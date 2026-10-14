@@ -67,3 +67,10 @@ export type {
   RedisClientLike,
   RedisErrorOptions,
 } from './adapters/redis-error-adapter.js';
+export { S3ErrorAdapter } from './adapters/s3-error-adapter.js';
+export type {
+  S3BatchOptions,
+  S3ClientLike,
+  S3ErrorOptions,
+  S3PutObjectInput,
+} from './adapters/s3-error-adapter.js';
