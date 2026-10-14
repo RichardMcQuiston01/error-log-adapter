@@ -35,3 +35,9 @@ export type {
   SqliteClientLike,
   SqliteErrorOptions,
 } from './adapters/sqlite-error-adapter.js';
+export { WebStorageErrorAdapter } from './adapters/web-storage-error-adapter.js';
+export type {
+  StorageLike,
+  WebStorageErrorOptions,
+  WebStorageErrorRecord,
+} from './adapters/web-storage-error-adapter.js';
