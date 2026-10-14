@@ -41,3 +41,11 @@ export type {
   WebStorageErrorOptions,
   WebStorageErrorRecord,
 } from './adapters/web-storage-error-adapter.js';
+export {
+  FlatFileErrorAdapter,
+  formatErrorLogLine,
+} from './adapters/flat-file-error-adapter.js';
+export type {
+  FileSystemLike,
+  FlatFileErrorOptions,
+} from './adapters/flat-file-error-adapter.js';

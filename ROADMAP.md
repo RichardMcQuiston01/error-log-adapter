@@ -19,44 +19,40 @@ Planned adapters, in priority order.
 - IndexedDB
 - SQLite
 - Web Storage (`sessionStorage` / `localStorage`)
+- Flat file (Node/Bun)
 
 ## Next Up
 
-### 1. Flat file (Node/Bun)
-
-- Append one line per entry to a text file.
-- Options: path, line format, optional size-based rotation.
-
-### 2. JSON file (Node/Bun)
+### 1. JSON file (Node/Bun)
 
 - Append entries as newline-delimited JSON (NDJSON), which is cheap to append and easy to parse.
 - Optional single-array JSON mode, rewritten on each write.
 
-### 3. MySQL / Postgres
+### 2. MySQL / Postgres
 
 - Shared SQL core with per-dialect placeholder handling (`?` vs `$1`).
 - Accept a minimal `query(sql, params)` client, so it works with `pg`, `mysql2`, and similar drivers.
 - Use native UUID types where the database supports them, and a JSON column for `cause`.
 - Provide DDL snippets for `error_log`.
 
-### 4. Redis
+### 3. Redis
 
 - Push JSON entries onto a list (`LPUSH` or `RPUSH`) with optional `LTRIM` to cap length.
 - Optional Streams (`XADD`) mode.
 
-### 5. S3 / DigitalOcean Spaces
+### 4. S3 / DigitalOcean Spaces
 
 - Write one object per entry, or batched objects, keyed by date and UUID.
 - Accept a minimal `putObject` client, since Spaces uses the S3 API.
 - Support a configurable prefix and content type.
 
-### 6. Firebase
+### 5. Firebase
 
 - Firestore: add a document to an `error_log` collection.
 - Optional Realtime Database support.
 - Accept a collection-like structural type.
 
-### 7. Webhook improvements
+### 6. Webhook improvements
 
 The base adapter is already shipped. Remaining work:
 
@@ -65,20 +61,20 @@ The base adapter is already shipped. Remaining work:
 - Optional batching.
 - Optional HMAC signature header.
 
-### 8. AWS CloudWatch Logs
+### 7. AWS CloudWatch Logs
 
 - Use `PutLogEvents` through an injected client.
 - Worth it for apps running outside managed AWS runtimes (Lambda and ECS already ship stdout to CloudWatch).
 - Scope: one log group/stream per adapter instance; handle sequence tokens and the batch size limit.
 - SNS publishing could share the same client pattern later.
 
-### 9. Event Emitter
+### 8. Event Emitter
 
 - Emit each entry as an event on a user-supplied emitter (anything with `emit(name, payload)`).
 - Cheap to build and useful for in-process hooks: UI toasts, metrics counters, and test assertions.
 - Scope: no dependencies, and it works with Node `EventEmitter`, `EventTarget` wrappers, and mitt-style emitters.
 
-### 10. WebSocket
+### 9. WebSocket
 
 - Send JSON entries over a caller-owned socket (anything with `send` and `readyState`).
 - Lowest priority; keep it thin. The caller owns connect and reconnect.
