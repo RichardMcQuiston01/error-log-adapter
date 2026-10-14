@@ -1,4 +1,4 @@
-# Project Title
+# @richardmcquiston01/error-log-adapter
 
 - Author: [Richard McQuiston](mailto:richard.mcquiston@gmail.com)
 - Website: https://richardmcquiston.com/
@@ -8,6 +8,8 @@
 | [Overview](#overview) | [Getting Started](#getting-started) | [Buy Me a Coffee](#buy-me-a-coffee) | [License](#license) | [Copyright](#copyright) |
 
 ## Overview
+
+A small, dependency-free TypeScript library for routing runtime errors to the sink of your choice. Code against a single ErrorLogAdapter interface, then swap between console, webhook, MongoDB, or your own custom adapter without changing application code. Adapters never throw: a failing sink is caught and reported to the console, so error logging can’t take down your app.
 
 [Back to Top](#table-of-contents)
 
