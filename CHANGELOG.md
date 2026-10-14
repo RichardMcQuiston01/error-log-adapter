@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## Unreleased
+
+- `PostgresErrorAdapter` and `MySqlErrorAdapter` write entries to Postgres and MySQL / MariaDB through a one-method `query(sql, params)` client, which `pg` and `mysql2/promise` pools and connections already provide. Rows go into a singular `error_log` table: a native `UUID` key and `JSONB` / `TIMESTAMPTZ` columns on Postgres, a `CHAR(36)` key and `JSON` / `DATETIME(3)` (UTC) columns on MySQL. The table is created on first use, or run `buildErrorLogTableDdl(dialect)` yourself.
+
 ## 0.2.0
 
 - `JsonFileErrorAdapter` stores entries as JSON in a file (Node and Bun). `ndjson` mode (default) appends one compact object per line. `array` mode keeps one indented JSON array, rewritten safely through a temporary file, with an optional `maxEntries` cap. A file that is not valid JSON is moved to `<path>.corrupt` instead of being overwritten.
