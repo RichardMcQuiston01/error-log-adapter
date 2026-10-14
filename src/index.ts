@@ -35,3 +35,20 @@ export type {
   SqliteClientLike,
   SqliteErrorOptions,
 } from './adapters/sqlite-error-adapter.js';
+export { WebStorageErrorAdapter } from './adapters/web-storage-error-adapter.js';
+export type {
+  StorageLike,
+  WebStorageErrorOptions,
+  WebStorageErrorRecord,
+} from './adapters/web-storage-error-adapter.js';
+export {
+  FlatFileErrorAdapter,
+  formatErrorLogLine,
+} from './adapters/flat-file-error-adapter.js';
+export type { FlatFileErrorOptions } from './adapters/flat-file-error-adapter.js';
+export type { FileSystemLike, ReadWriteFileSystemLike } from './file-system.js';
+export { JsonFileErrorAdapter } from './adapters/json-file-error-adapter.js';
+export type {
+  JsonFileErrorOptions,
+  JsonFileErrorRecord,
+} from './adapters/json-file-error-adapter.js';
