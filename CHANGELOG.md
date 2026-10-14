@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `RedisErrorAdapter` writes entries to Redis through a one-method `sendCommand(args)` client, which node-redis already provides (ioredis needs a one-line wrapper, shown in the docs). `list` mode (default) pushes one JSON record per entry with `RPUSH` or `LPUSH` and trims to `maxEntries` with `LTRIM`. `stream` mode appends each entry with `XADD` and an exact `MAXLEN` cap.
 - `PostgresErrorAdapter` and `MySqlErrorAdapter` write entries to Postgres and MySQL / MariaDB through a one-method `query(sql, params)` client, which `pg` and `mysql2/promise` pools and connections already provide. Rows go into a singular `error_log` table: a native `UUID` key and `JSONB` / `TIMESTAMPTZ` columns on Postgres, a `CHAR(36)` key and `JSON` / `DATETIME(3)` (UTC) columns on MySQL. The table is created on first use, or run `buildErrorLogTableDdl(dialect)` yourself.
 
 ## 0.2.0
