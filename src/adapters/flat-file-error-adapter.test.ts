@@ -7,7 +7,7 @@ import {
   FlatFileErrorAdapter,
   formatErrorLogLine,
 } from './flat-file-error-adapter.js';
-import type { FileSystemLike } from './flat-file-error-adapter.js';
+import type { FileSystemLike } from '../file-system.js';
 
 const TIMESTAMP = '2026-01-02T03:04:05.000Z';
 

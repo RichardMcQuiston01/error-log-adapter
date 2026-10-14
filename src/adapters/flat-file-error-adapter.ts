@@ -1,3 +1,9 @@
+import {
+  isMissingFileError,
+  loadNodeFileSystem,
+  parentDirectory,
+} from '../file-system.js';
+import type { FileSystemLike } from '../file-system.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type { SerializedErrorLogEntry } from '../serialize.js';
 import type {
@@ -8,18 +14,6 @@ import type {
 
 /** Default number of rotated files kept when `maxBytes` is set. */
 export const DEFAULT_MAX_FILES = 3;
-
-/**
- * The subset of `node:fs/promises` this adapter uses. Pass `fs.promises` (or
- * `node:fs/promises`) yourself, or leave `fs` unset in Node and Bun.
- */
-export interface FileSystemLike {
-  appendFile(path: string, data: string): Promise<unknown>;
-  mkdir(path: string, options: { recursive: true }): Promise<unknown>;
-  stat(path: string): Promise<{ size: number }>;
-  rename(from: string, to: string): Promise<unknown>;
-  rm(path: string, options: { force: true }): Promise<unknown>;
-}
 
 export interface FlatFileErrorOptions {
   /** File system to write to. Defaults to `node:fs/promises`, loaded on first use. */
@@ -69,26 +63,6 @@ export function formatErrorLogLine(entry: SerializedErrorLogEntry): string {
     entry.cause === undefined ? '' : ` (cause: ${describeCause(entry.cause)})`;
   return escapeLineBreaks(
     `${entry.timestamp} [${entry.code}] ${source}${entry.message}${cause}`
-  );
-}
-
-/** Returns the folder part of a path, or `null` if the path has none. */
-function parentDirectory(filePath: string): string | null {
-  const lastSeparator: number = Math.max(
-    filePath.lastIndexOf('/'),
-    filePath.lastIndexOf('\\')
-  );
-  if (lastSeparator < 0) {
-    return null;
-  }
-  return lastSeparator === 0 ? '/' : filePath.slice(0, lastSeparator);
-}
-
-function isMissingFileError(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    (error as { code?: unknown }).code === 'ENOENT'
   );
 }
 
@@ -165,9 +139,7 @@ export class FlatFileErrorAdapter<
   /** Uses the injected file system, or loads `node:fs/promises` on first use. */
   private async getFileSystem(): Promise<FileSystemLike> {
     if (this.fs === undefined) {
-      // A variable specifier keeps browser bundlers from resolving it.
-      const moduleName: string = 'node:fs/promises';
-      this.fs = (await import(moduleName)) as FileSystemLike;
+      this.fs = await loadNodeFileSystem();
     }
     return this.fs;
   }
