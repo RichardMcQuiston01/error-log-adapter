@@ -1,6 +1,6 @@
 # ROADMAP
 
-Planned adapters, in priority order. Items marked **(?)** are under consideration and may be dropped.
+Planned adapters, in priority order.
 
 ## Design Principles
 
@@ -79,21 +79,24 @@ The base adapter is already shipped. Remaining work:
 - Optional batching.
 - Optional HMAC signature header.
 
-### 11. AWS CloudWatch Logs **(?)**
+### 11. AWS CloudWatch Logs
 
 - Use `PutLogEvents` through an injected client.
-- SNS publishing could share the same client pattern.
-- Open question: sequence tokens and batching, and whether this overlaps with the S3 adapter's audience.
+- Worth it for apps running outside managed AWS runtimes (Lambda and ECS already ship stdout to CloudWatch).
+- Scope: one log group/stream per adapter instance; handle sequence tokens and the batch size limit.
+- SNS publishing could share the same client pattern later.
 
-### 12. Event Emitter **(?)**
+### 12. Event Emitter
 
-- Emit each entry as an event on a user-supplied emitter, so apps can attach their own listeners.
-- Open question: whether a `Composite` of custom adapters already covers this.
+- Emit each entry as an event on a user-supplied emitter (anything with `emit(name, payload)`).
+- Cheap to build and useful for in-process hooks: UI toasts, metrics counters, and test assertions.
+- Scope: no dependencies, and it works with Node `EventEmitter`, `EventTarget` wrappers, and mitt-style emitters.
 
-### 13. WebSocket **(?)**
+### 13. WebSocket
 
-- Send JSON entries over an open socket.
-- Open question: reconnect and buffering behavior, and whether to leave that to the caller.
+- Send JSON entries over a caller-owned socket (anything with `send` and `readyState`).
+- Lowest priority; keep it thin. The caller owns connect and reconnect.
+- Scope: return a descriptive failure if the socket is not open, with no internal buffering in the first version.
 
 ## Cross-Cutting Work
 
