@@ -52,3 +52,13 @@ export type {
   JsonFileErrorOptions,
   JsonFileErrorRecord,
 } from './adapters/json-file-error-adapter.js';
+export {
+  MySqlErrorAdapter,
+  PostgresErrorAdapter,
+  buildErrorLogTableDdl,
+} from './adapters/sql-error-adapter.js';
+export type {
+  SqlClientLike,
+  SqlDialect,
+  SqlErrorOptions,
+} from './adapters/sql-error-adapter.js';
