@@ -84,3 +84,15 @@ export type {
   FirestoreCollectionLike,
   RealtimeDatabaseRefLike,
 } from './adapters/firebase-error-adapter.js';
+export {
+  SupabaseErrorAdapter,
+  buildSupabaseSetupSql,
+} from './adapters/supabase-error-adapter.js';
+export type {
+  SupabaseClientLike,
+  SupabaseErrorLike,
+  SupabaseErrorOptions,
+  SupabaseErrorRow,
+  SupabaseInsertResult,
+  SupabaseSetupOptions,
+} from './adapters/supabase-error-adapter.js';
