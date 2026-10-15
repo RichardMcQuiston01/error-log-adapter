@@ -1,4 +1,5 @@
 import { describeError, serializeEntry } from '../serialize.js';
+import { resolveTimeoutMs, timeoutMessage } from '../timeout.js';
 import type {
   ErrorLogAdapter,
   ErrorLogEntry,
@@ -17,6 +18,13 @@ export interface WebhookErrorOptions {
    * Defaults to `false`.
    */
   allowInsecure?: boolean;
+  /**
+   * How long to wait for the webhook to answer, in milliseconds. Defaults to
+   * 10000. Pass `Infinity` to wait without limit. When it passes, the request is
+   * cancelled, so the connection is closed rather than left open; the server may
+   * still have received the entry.
+   */
+  timeoutMs?: number;
 }
 
 const LOOPBACK_HOSTS: ReadonlySet<string> = new Set([
@@ -53,19 +61,30 @@ export class WebhookErrorAdapter<
   TCode extends string = string,
 > implements ErrorLogAdapter<TCode> {
   private readonly prefix: string;
+  private readonly timeoutMs: number;
   /** Scheme and host only. Webhook URLs often carry a secret in the path or query. */
   private readonly target: string;
 
-  /** @throws {RangeError} if `url` is not a valid `https://` URL (see `allowInsecure`). */
+  /** @throws {RangeError} if `url` is not a valid `https://` URL (see `allowInsecure`) or `timeoutMs` is invalid. */
   constructor(
     private readonly url: string,
     private readonly options: WebhookErrorOptions = {}
   ) {
     this.prefix = options.prefix ?? '[error-log-adapter]';
+    this.timeoutMs = resolveTimeoutMs(options.timeoutMs, 'WebhookErrorAdapter');
     this.target = parseWebhookUrl(url, options.allowInsecure ?? false).origin;
   }
 
   async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
+    const controller: AbortController = new AbortController();
+    let timedOut = false;
+    const timer: ReturnType<typeof setTimeout> | undefined =
+      this.timeoutMs === Infinity
+        ? undefined
+        : setTimeout((): void => {
+            timedOut = true;
+            controller.abort();
+          }, this.timeoutMs);
     try {
       const response: Response = await fetch(this.url, {
         method: 'POST',
@@ -77,6 +96,7 @@ export class WebhookErrorAdapter<
         // A redirect would turn the POST into a GET without a body (302, 303)
         // or re-send the entry and headers to another host (307, 308).
         redirect: 'manual',
+        signal: controller.signal,
       });
       if (response.type === 'opaqueredirect') {
         return this.fail(this.redirectMessage('a redirect'));
@@ -92,9 +112,16 @@ export class WebhookErrorAdapter<
       return { ok: true };
     } catch (error: unknown) {
       console.error(`${this.prefix} WebhookErrorAdapter:`, error);
+      if (timedOut) {
+        return this.fail(
+          timeoutMessage(`webhook ${this.target}`, this.timeoutMs)
+        );
+      }
       return this.fail(
         `could not reach webhook ${this.target}: ${this.redact(describeError(error))}`
       );
+    } finally {
+      clearTimeout(timer);
     }
   }
 

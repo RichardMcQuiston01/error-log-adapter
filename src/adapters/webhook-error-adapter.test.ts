@@ -190,4 +190,82 @@ describe('WebhookErrorAdapter', () => {
       expect(() => new WebhookErrorAdapter(url)).toThrow(RangeError);
     }
   );
+
+  describe('timeout', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** A fetch that never answers on its own but rejects like the real one when aborted. */
+    function hangingFetch() {
+      return vi.fn(
+        (_url: string, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () =>
+              reject(
+                new DOMException('This operation was aborted', 'AbortError')
+              )
+            );
+          })
+      );
+    }
+
+    it('aborts the request and fails after the default 10 seconds', async () => {
+      vi.useFakeTimers();
+      const mockFetch = hangingFetch();
+      vi.stubGlobal('fetch', mockFetch);
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const pending = new WebhookErrorAdapter(
+        'https://hooks.example.com/services/SECRET'
+      ).log(ENTRY);
+      await vi.advanceTimersByTimeAsync(10_000);
+      const result = await pending;
+
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain(
+        'webhook https://hooks.example.com did not respond within 10000 ms'
+      );
+      expect(result.error).not.toContain('SECRET');
+      const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+      expect(init.signal?.aborted).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+      spy.mockRestore();
+    });
+
+    it('uses a custom timeoutMs and leaves no timer behind on success', async () => {
+      vi.useFakeTimers();
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, status: 200 })
+      );
+
+      const result = await new WebhookErrorAdapter('https://example.com/e', {
+        timeoutMs: 250,
+      }).log(ENTRY);
+
+      expect(result).toEqual({ ok: true });
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('does not set a timer for Infinity', async () => {
+      vi.useFakeTimers();
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, status: 200 })
+      );
+      const pending = new WebhookErrorAdapter('https://example.com/e', {
+        timeoutMs: Infinity,
+      }).log(ENTRY);
+      expect(vi.getTimerCount()).toBe(0);
+      await pending;
+    });
+
+    it.each([0, -1, NaN])('rejects timeoutMs %s', (value: number) => {
+      expect(
+        () =>
+          new WebhookErrorAdapter('https://example.com/e', { timeoutMs: value })
+      ).toThrow(/WebhookErrorAdapter: timeoutMs must be a positive number/);
+    });
+  });
 });
