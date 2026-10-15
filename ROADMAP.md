@@ -24,16 +24,12 @@ Planned adapters, in priority order.
 - MySQL / Postgres
 - Redis: capped list or stream
 - S3 / DigitalOcean Spaces (and other S3-compatible stores): one object per entry or batched
+- Firebase: Firestore and Realtime Database
+- Supabase: through `supabase-js` (for a direct connection, use the Postgres adapter)
 
 ## Next Up
 
-### 1. Firebase
-
-- Firestore: add a document to an `error_log` collection.
-- Optional Realtime Database support.
-- Accept a collection-like structural type.
-
-### 2. Webhook improvements
+### 1. Webhook improvements
 
 The base adapter is already shipped. Remaining work:
 
@@ -42,20 +38,20 @@ The base adapter is already shipped. Remaining work:
 - Optional batching.
 - Optional HMAC signature header.
 
-### 3. AWS CloudWatch Logs
+### 2. AWS CloudWatch Logs
 
 - Use `PutLogEvents` through an injected client.
 - Worth it for apps running outside managed AWS runtimes (Lambda and ECS already ship stdout to CloudWatch).
 - Scope: one log group/stream per adapter instance; handle sequence tokens and the batch size limit.
 - SNS publishing could share the same client pattern later.
 
-### 4. Event Emitter
+### 3. Event Emitter
 
 - Emit each entry as an event on a user-supplied emitter (anything with `emit(name, payload)`).
 - Cheap to build and useful for in-process hooks: UI toasts, metrics counters, and test assertions.
 - Scope: no dependencies, and it works with Node `EventEmitter`, `EventTarget` wrappers, and mitt-style emitters.
 
-### 5. WebSocket
+### 4. WebSocket
 
 - Send JSON entries over a caller-owned socket (anything with `send` and `readyState`).
 - Lowest priority; keep it thin. The caller owns connect and reconnect.
@@ -63,6 +59,7 @@ The base adapter is already shipped. Remaining work:
 
 ## Cross-Cutting Work
 
+- Optional retention for the Firebase adapters: a `Date` field Firestore can apply a TTL policy to, so old log documents expire on their own.
 - Let the SQLite adapter share the table name validation and DDL helpers that the MySQL / Postgres adapters now have.
 - Size-based rotation for the JSON file adapter's NDJSON mode (the flat file adapter already has it), ideally by sharing the rotation code.
 - Fill in README Getting Started, Usage, and Examples.
