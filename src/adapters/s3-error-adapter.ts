@@ -1,3 +1,4 @@
+import { generateId } from '../uuid.js';
 import { resolveTimeoutMs, timeoutMessage, withTimeout } from '../timeout.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type {
@@ -151,7 +152,7 @@ export class S3ErrorAdapter<
   async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
     try {
       const record: S3Record = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         ...serializeEntry(entry),
       };
       const occurredAt: Date = new Date(record.timestamp);
@@ -226,7 +227,7 @@ export class S3ErrorAdapter<
       return { ok: true };
     }
     try {
-      const key: string = `${this.keyPrefix}${datePath(new Date())}-${crypto.randomUUID()}.ndjson`;
+      const key: string = `${this.keyPrefix}${datePath(new Date())}-${generateId()}.ndjson`;
       const body: string = pending
         .map((record: S3Record): string => JSON.stringify(record))
         .join('\n');

@@ -1,3 +1,4 @@
+import { generateId } from '../uuid.js';
 import { resolveTimeoutMs, timeoutMessage, withTimeout } from '../timeout.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type {
@@ -214,7 +215,7 @@ export class SupabaseErrorAdapter<
     try {
       const serialized = serializeEntry(entry);
       const row: SupabaseErrorRow = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         code: serialized.code,
         message: serialized.message,
         cause: serialized.cause === undefined ? null : serialized.cause,

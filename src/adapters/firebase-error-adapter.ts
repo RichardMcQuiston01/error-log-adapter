@@ -1,3 +1,4 @@
+import { generateId } from '../uuid.js';
 import {
   DEFAULT_TIMEOUT_MS,
   resolveTimeoutMs,
@@ -92,7 +93,7 @@ function buildRecord<TCode extends string>(
 ): FirebaseErrorRecord {
   const serialized = serializeEntry(entry);
   const record: FirebaseErrorRecord = {
-    id: crypto.randomUUID(),
+    id: generateId(),
     code: serialized.code,
     message: serialized.message,
     timestamp: serialized.timestamp,

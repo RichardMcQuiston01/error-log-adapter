@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ErrorLogEntry } from '../types.js';
 import { WebStorageErrorAdapter } from './web-storage-error-adapter.js';
 import type {
+  LockManagerLike,
   StorageLike,
   WebStorageErrorRecord,
 } from './web-storage-error-adapter.js';
@@ -103,7 +104,7 @@ describe('WebStorageErrorAdapter', () => {
   });
 
   it('fails with a descriptive error if even one entry does not fit', async () => {
-    const storage = new FakeStorage(10);
+    const storage = new FakeStorage(5);
     const spy = silenceConsole();
 
     const result = await new WebStorageErrorAdapter(storage).log(entry('x'));
@@ -154,6 +155,169 @@ describe('WebStorageErrorAdapter', () => {
       spy.mockRestore();
     }
   );
+
+  it.each(['not json', '{"a":1}'])(
+    'copies an unreadable stored value (%s) to a .corrupt key before replacing it',
+    async (stored: string) => {
+      const storage = new FakeStorage();
+      storage.data.set('error_log', stored);
+      const spy = silenceConsole();
+
+      await new WebStorageErrorAdapter(storage).log(entry('fresh'));
+
+      expect(storage.data.get('error_log.corrupt')).toBe(stored);
+      expect(spy).toHaveBeenCalledWith(
+        expect.stringContaining('a copy was kept under "error_log.corrupt"')
+      );
+      spy.mockRestore();
+    }
+  );
+
+  it('does not overwrite an earlier .corrupt copy', async () => {
+    const storage = new FakeStorage();
+    storage.data.set('error_log', 'second bad value');
+    storage.data.set('error_log.corrupt', 'first bad value');
+    const spy = silenceConsole();
+
+    await new WebStorageErrorAdapter(storage).log(entry('fresh'));
+
+    expect(storage.data.get('error_log.corrupt')).toBe('first bad value');
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining('already holds an earlier copy')
+    );
+    spy.mockRestore();
+  });
+
+  it('still replaces the value when the copy cannot be saved', async () => {
+    const storage = new FakeStorage(5);
+    storage.data.set('error_log', 'not json!!');
+    const spy = silenceConsole();
+
+    const result = await new WebStorageErrorAdapter(storage, {
+      maxEntries: 1,
+    }).log({ code: 'E', message: 'm' });
+
+    // The record itself does not fit in 5 characters either, so the write
+    // fails, but the failure to keep a copy must not be what stops it.
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining('could not be copied aside')
+    );
+    expect(result.ok).toBe(false);
+    spy.mockRestore();
+  });
+
+  it('does not touch a missing key', async () => {
+    const storage = new FakeStorage();
+    await new WebStorageErrorAdapter(storage).log(entry('first'));
+    expect(storage.data.has('error_log.corrupt')).toBe(false);
+  });
+
+  describe('cross-tab locking', () => {
+    function fakeLocks(): {
+      locks: LockManagerLike;
+      names: string[];
+      running: { count: number; max: number };
+    } {
+      const names: string[] = [];
+      const running = { count: 0, max: 0 };
+      let queue: Promise<unknown> = Promise.resolve();
+      const locks: LockManagerLike = {
+        request<T>(name: string, callback: () => T | Promise<T>): Promise<T> {
+          names.push(name);
+          const result: Promise<T> = queue.then(async (): Promise<T> => {
+            running.count += 1;
+            running.max = Math.max(running.max, running.count);
+            try {
+              return await callback();
+            } finally {
+              running.count -= 1;
+            }
+          });
+          queue = result.catch(() => undefined);
+          return result;
+        },
+      };
+      return { locks, names, running };
+    }
+
+    it('writes inside a lock named after the storage key', async () => {
+      const storage = new FakeStorage();
+      const { locks, names } = fakeLocks();
+
+      const result = await new WebStorageErrorAdapter(storage, {
+        locks,
+        key: 'app_errors',
+      }).log(entry('one'));
+
+      expect(result).toEqual({ ok: true });
+      expect(names).toEqual(['error-log-adapter:app_errors']);
+      expect(storage.records('app_errors')).toHaveLength(1);
+    });
+
+    it('keeps both entries when two adapters (tabs) log at once', async () => {
+      const storage = new FakeStorage();
+      const { locks, running } = fakeLocks();
+      const tabA = new WebStorageErrorAdapter(storage, { locks });
+      const tabB = new WebStorageErrorAdapter(storage, { locks });
+
+      await Promise.all([tabA.log(entry('a')), tabB.log(entry('b'))]);
+
+      expect(
+        storage
+          .records()
+          .map((r) => r.message)
+          .sort()
+      ).toEqual(['a', 'b']);
+      expect(running.max).toBe(1);
+    });
+
+    it('still writes when the lock cannot be taken', async () => {
+      const storage = new FakeStorage();
+      const locks: LockManagerLike = {
+        request: () => Promise.reject(new Error('SecurityError')),
+      };
+
+      const result = await new WebStorageErrorAdapter(storage, { locks }).log(
+        entry('x')
+      );
+
+      expect(result).toEqual({ ok: true });
+      expect(storage.records()).toHaveLength(1);
+    });
+
+    it('reports a write failure that happens inside the lock once, without retrying', async () => {
+      const storage = new FakeStorage(1);
+      const { locks, names } = fakeLocks();
+      const spy = silenceConsole();
+
+      const result = await new WebStorageErrorAdapter(storage, { locks }).log(
+        entry('too big')
+      );
+
+      expect(result.ok).toBe(false);
+      expect(names).toHaveLength(1);
+      spy.mockRestore();
+    });
+
+    it('works without locks when null is passed', async () => {
+      const storage = new FakeStorage();
+      const result = await new WebStorageErrorAdapter(storage, {
+        locks: null,
+      }).log(entry('x'));
+      expect(result).toEqual({ ok: true });
+    });
+
+    it('uses navigator.locks by default when the browser provides it', async () => {
+      const storage = new FakeStorage();
+      const { locks, names } = fakeLocks();
+      vi.stubGlobal('navigator', { locks });
+
+      await new WebStorageErrorAdapter(storage).log(entry('x'));
+
+      expect(names).toEqual(['error-log-adapter:error_log']);
+      vi.unstubAllGlobals();
+    });
+  });
 
   it('stores an entry whose cause is circular, marking the loop', async () => {
     const circular: Record<string, unknown> = {};

@@ -1,3 +1,4 @@
+import { generateId } from '../uuid.js';
 import { resolveTimeoutMs, timeoutMessage, withTimeout } from '../timeout.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type {
@@ -160,7 +161,7 @@ abstract class SqlErrorAdapter<
         );
       }
       const params: unknown[] = [
-        crypto.randomUUID(),
+        generateId(),
         serialized.code,
         serialized.message,
         serialized.cause === undefined
