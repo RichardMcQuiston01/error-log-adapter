@@ -210,12 +210,39 @@ describe('buildSupabaseSetupSql', () => {
     );
   });
 
-  it('adds an insert-only policy for the given roles', () => {
+  it('adds a size-limited insert-only policy for the given roles', () => {
     const statements: string[] = buildSupabaseSetupSql('app_error', {
-      insertRoles: ['anon', 'authenticated'],
+      insertRoles: ['authenticated'],
     });
-    expect(statements).toContain(
-      'CREATE POLICY "app_error_insert_only" ON "app_error" FOR INSERT TO "anon", "authenticated" WITH CHECK (true)'
+    const policy: string = statements[statements.length - 1];
+    expect(policy).toContain(
+      'CREATE POLICY "app_error_insert_only" ON "app_error" FOR INSERT TO "authenticated"'
+    );
+    expect(policy).not.toContain('WITH CHECK (true)');
+    expect(policy).toContain('char_length(code) <= 255');
+    expect(policy).toContain('char_length(message) <= 4096');
+    expect(policy).toContain('char_length(source) <= 255');
+    expect(policy).toContain('pg_column_size(cause) <= 8192');
+  });
+
+  it('never grants anon or public by default', () => {
+    expect(
+      buildSupabaseSetupSql().some((sql: string) => sql.includes('"anon"'))
+    ).toBe(false);
+    for (const role of ['anon', 'ANON', 'public']) {
+      expect(() =>
+        buildSupabaseSetupSql('error_log', { insertRoles: [role] })
+      ).toThrow(/allowPublicInsert/);
+    }
+  });
+
+  it('grants anon only when allowPublicInsert is set', () => {
+    const statements: string[] = buildSupabaseSetupSql('error_log', {
+      insertRoles: ['anon', 'authenticated'],
+      allowPublicInsert: true,
+    });
+    expect(statements[statements.length - 1]).toContain(
+      'TO "anon", "authenticated" WITH CHECK ('
     );
   });
 
