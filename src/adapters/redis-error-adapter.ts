@@ -1,3 +1,4 @@
+import { resolveEntryId } from '../entry-id.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
@@ -94,7 +95,7 @@ export class RedisErrorAdapter<
 
   async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
     try {
-      const record = { id: crypto.randomUUID(), ...serializeEntry(entry) };
+      const record = { id: resolveEntryId(entry), ...serializeEntry(entry) };
       if (this.mode === 'stream') {
         await this.client.sendCommand(this.buildStreamCommand(record));
       } else {

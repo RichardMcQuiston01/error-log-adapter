@@ -1,3 +1,4 @@
+import { hasCallerId, resolveEntryId } from '../entry-id.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
@@ -166,7 +167,7 @@ export class SupabaseErrorAdapter<
     try {
       const serialized = serializeEntry(entry);
       const row: SupabaseErrorRow = {
-        id: crypto.randomUUID(),
+        id: resolveEntryId(entry),
         code: serialized.code,
         message: serialized.message,
         cause: serialized.cause === undefined ? null : serialized.cause,
@@ -177,6 +178,10 @@ export class SupabaseErrorAdapter<
         .from(this.tableName)
         .insert(row);
       if (result.error) {
+        if (hasCallerId(entry) && result.error.code === '23505') {
+          // Unique violation on the id: this entry was stored by an earlier call.
+          return { ok: true };
+        }
         console.error(`${this.prefix} SupabaseErrorAdapter:`, result);
         return this.fail(describeSupabaseError(result));
       }

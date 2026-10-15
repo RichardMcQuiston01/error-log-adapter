@@ -1,3 +1,4 @@
+import { hasCallerId, resolveEntryId } from '../entry-id.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type { SerializedErrorLogEntry } from '../serialize.js';
 import type {
@@ -15,6 +16,12 @@ type IdbHandler = ((event: never) => unknown) | null;
 /** The subset of an `IDBObjectStore` this adapter uses. */
 export interface IdbObjectStoreLike {
   add(value: unknown): unknown;
+  /**
+   * Replaces the record with the same key. Used for entries that carry their own
+   * `id`, so logging one again does not fail on the existing key. A real
+   * `IDBObjectStore` has it; a fake without it falls back to `add`.
+   */
+  put?(value: unknown): unknown;
 }
 
 /** The subset of an `IDBTransaction` this adapter uses. */
@@ -85,10 +92,10 @@ export class IndexedDbErrorAdapter<
   async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
     try {
       const record: IndexedDbErrorRecord = {
-        id: crypto.randomUUID(),
+        id: resolveEntryId(entry),
         ...serializeEntry(entry),
       };
-      await this.write(record);
+      await this.write(record, hasCallerId(entry));
       return { ok: true };
     } catch (error: unknown) {
       console.error(`${this.prefix} IndexedDbErrorAdapter:`, error);
@@ -100,7 +107,10 @@ export class IndexedDbErrorAdapter<
   }
 
   /** Resolves once the transaction commits; rejects if it errors or aborts. */
-  private write(record: IndexedDbErrorRecord): Promise<void> {
+  private write(
+    record: IndexedDbErrorRecord,
+    replaceExisting: boolean
+  ): Promise<void> {
     return new Promise<void>(
       (resolve: () => void, reject: (reason: unknown) => void): void => {
         const transaction: IdbTransactionLike = this.database.transaction(
@@ -116,7 +126,14 @@ export class IndexedDbErrorAdapter<
         transaction.oncomplete = (): void => resolve();
         transaction.onerror = fail('failed');
         transaction.onabort = fail('aborted');
-        transaction.objectStore(this.storeName).add(record);
+        const store: IdbObjectStoreLike = transaction.objectStore(
+          this.storeName
+        );
+        if (replaceExisting && typeof store.put === 'function') {
+          store.put(record);
+        } else {
+          store.add(record);
+        }
       }
     );
   }

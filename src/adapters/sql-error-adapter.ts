@@ -1,3 +1,4 @@
+import { resolveEntryId } from '../entry-id.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
@@ -137,7 +138,7 @@ abstract class SqlErrorAdapter<
         );
       }
       const params: unknown[] = [
-        crypto.randomUUID(),
+        resolveEntryId(entry),
         serialized.code,
         serialized.message,
         serialized.cause === undefined
@@ -165,7 +166,12 @@ abstract class SqlErrorAdapter<
       this.dialect === 'postgres'
         ? '$1, $2, $3, $4, $5, $6'
         : '?, ?, ?, ?, ?, ?';
-    return `INSERT INTO ${quoteIdentifier(this.dialect, this.tableName)} (id, code, message, cause, source, occurred_at) VALUES (${placeholders})`;
+    // A repeated entry id is a retry: keep the stored row instead of failing on the key.
+    const onRepeat: string =
+      this.dialect === 'postgres'
+        ? 'ON CONFLICT (id) DO NOTHING'
+        : 'ON DUPLICATE KEY UPDATE id = id';
+    return `INSERT INTO ${quoteIdentifier(this.dialect, this.tableName)} (id, code, message, cause, source, occurred_at) VALUES (${placeholders}) ${onRepeat}`;
   }
 
   /** Creates the table once. A failed attempt is retried on the next log call. */

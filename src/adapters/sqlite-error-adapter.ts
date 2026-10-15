@@ -1,3 +1,4 @@
+import { resolveEntryId } from '../entry-id.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
@@ -90,9 +91,9 @@ export class SqliteErrorAdapter<
       await this.ensureTable();
       const serialized = serializeEntry(entry);
       await this.client.run(
-        `INSERT INTO ${this.tableName} (id, code, message, cause, source, occurred_at) VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO ${this.tableName} (id, code, message, cause, source, occurred_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO NOTHING`,
         [
-          crypto.randomUUID(),
+          resolveEntryId(entry),
           serialized.code,
           serialized.message,
           serialized.cause === undefined

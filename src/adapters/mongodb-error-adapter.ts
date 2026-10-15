@@ -1,3 +1,4 @@
+import { hasCallerId, resolveEntryId } from '../entry-id.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
@@ -15,6 +16,15 @@ export interface MongoDbErrorOptions {
   prefix?: string;
 }
 
+/** MongoDB reports a repeated `_id` as error code 11000. */
+function isDuplicateKeyError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { code?: unknown }).code === 11000
+  );
+}
+
 export class MongoDbErrorAdapter<
   TCode extends string = string,
 > implements ErrorLogAdapter<TCode> {
@@ -29,9 +39,16 @@ export class MongoDbErrorAdapter<
 
   async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
     try {
-      await this.collection.insertOne(serializeEntry(entry));
+      const document: object = hasCallerId(entry)
+        ? { _id: resolveEntryId(entry), ...serializeEntry(entry) }
+        : serializeEntry(entry);
+      await this.collection.insertOne(document);
       return { ok: true };
     } catch (error: unknown) {
+      if (hasCallerId(entry) && isDuplicateKeyError(error)) {
+        // The same id was stored before: this call is a retry that already succeeded.
+        return { ok: true };
+      }
       console.error(`${this.prefix} MongoDbErrorAdapter:`, error);
       return {
         ok: false,

@@ -36,7 +36,7 @@ describe.each([
     create: (client: SqlClientLike, options?: object) =>
       new PostgresErrorAdapter(client, options),
     insertStart:
-      'INSERT INTO "error_log" (id, code, message, cause, source, occurred_at) VALUES ($1, $2, $3, $4, $5, $6)',
+      'INSERT INTO "error_log" (id, code, message, cause, source, occurred_at) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING',
     occurredAt: '2026-01-02T03:04:05.678Z',
   },
   {
@@ -44,7 +44,7 @@ describe.each([
     create: (client: SqlClientLike, options?: object) =>
       new MySqlErrorAdapter(client, options),
     insertStart:
-      'INSERT INTO `error_log` (id, code, message, cause, source, occurred_at) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO `error_log` (id, code, message, cause, source, occurred_at) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE id = id',
     occurredAt: '2026-01-02 03:04:05.678',
   },
 ])('$name', ({ name, create, insertStart, occurredAt }) => {

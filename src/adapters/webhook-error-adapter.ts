@@ -1,3 +1,4 @@
+import { hasCallerId, resolveEntryId } from '../entry-id.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
@@ -32,7 +33,12 @@ export class WebhookErrorAdapter<
           'Content-Type': 'application/json',
           ...this.options.headers,
         },
-        body: JSON.stringify(serializeEntry(entry)),
+        // A caller-supplied id goes along so the receiver can drop a repeat.
+        body: JSON.stringify(
+          hasCallerId(entry)
+            ? { id: resolveEntryId(entry), ...serializeEntry(entry) }
+            : serializeEntry(entry)
+        ),
       });
       if (!response.ok) {
         return this.fail(

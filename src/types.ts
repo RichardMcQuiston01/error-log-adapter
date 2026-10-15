@@ -10,6 +10,17 @@ export interface ErrorLogEntry<TCode extends string = string> {
   source?: string;
   /** ISO 8601 timestamp. Adapters fill this in when it is omitted. */
   timestamp?: string;
+  /**
+   * Optional UUID that identifies this entry. Adapters generate a new one for
+   * every `log` call when it is omitted, so logging the same entry twice stores
+   * it twice. Supply the same `id` (and, for S3, the same `timestamp`) to make
+   * a retry safe: sinks that can detect a repeat overwrite or skip the existing
+   * record instead of adding another. It must be a UUID, for example from
+   * `crypto.randomUUID()`; anything else makes `log` return `ok: false`.
+   * Redis, the flat file and NDJSON file adapters, and the console cannot
+   * detect a repeat.
+   */
+  id?: string;
 }
 
 /** Outcome of a `log` call. Callers should check `ok`. */
