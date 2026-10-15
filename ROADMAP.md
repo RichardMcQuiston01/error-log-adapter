@@ -23,22 +23,17 @@ Planned adapters, in priority order.
 - JSON file (Node/Bun): newline-delimited JSON or a single array
 - MySQL / Postgres
 - Redis: capped list or stream
+- S3 / DigitalOcean Spaces (and other S3-compatible stores): one object per entry or batched
 
 ## Next Up
 
-### 1. S3 / DigitalOcean Spaces
-
-- Write one object per entry, or batched objects, keyed by date and UUID.
-- Accept a minimal `putObject` client, since Spaces uses the S3 API.
-- Support a configurable prefix and content type.
-
-### 2. Firebase
+### 1. Firebase
 
 - Firestore: add a document to an `error_log` collection.
 - Optional Realtime Database support.
 - Accept a collection-like structural type.
 
-### 3. Webhook improvements
+### 2. Webhook improvements
 
 The base adapter is already shipped. Remaining work:
 
@@ -47,20 +42,20 @@ The base adapter is already shipped. Remaining work:
 - Optional batching.
 - Optional HMAC signature header.
 
-### 4. AWS CloudWatch Logs
+### 3. AWS CloudWatch Logs
 
 - Use `PutLogEvents` through an injected client.
 - Worth it for apps running outside managed AWS runtimes (Lambda and ECS already ship stdout to CloudWatch).
 - Scope: one log group/stream per adapter instance; handle sequence tokens and the batch size limit.
 - SNS publishing could share the same client pattern later.
 
-### 5. Event Emitter
+### 4. Event Emitter
 
 - Emit each entry as an event on a user-supplied emitter (anything with `emit(name, payload)`).
 - Cheap to build and useful for in-process hooks: UI toasts, metrics counters, and test assertions.
 - Scope: no dependencies, and it works with Node `EventEmitter`, `EventTarget` wrappers, and mitt-style emitters.
 
-### 6. WebSocket
+### 5. WebSocket
 
 - Send JSON entries over a caller-owned socket (anything with `send` and `readyState`).
 - Lowest priority; keep it thin. The caller owns connect and reconnect.
