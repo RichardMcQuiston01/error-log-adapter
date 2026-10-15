@@ -319,19 +319,18 @@ describe('WebStorageErrorAdapter', () => {
     });
   });
 
-  it('returns a failure result if the cause cannot be serialized', async () => {
+  it('stores an entry whose cause is circular, marking the loop', async () => {
     const circular: Record<string, unknown> = {};
     circular['self'] = circular;
-    const spy = silenceConsole();
+    const storage = new FakeStorage();
 
-    const result = await new WebStorageErrorAdapter(new FakeStorage()).log({
+    const result = await new WebStorageErrorAdapter(storage).log({
       ...entry('x'),
       cause: circular,
     });
 
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain('circular');
-    spy.mockRestore();
+    expect(result).toEqual({ ok: true });
+    expect(storage.getItem('error_log')).toContain('[Circular]');
   });
 
   it.each([0, -1, 1.5, Number.NaN])(

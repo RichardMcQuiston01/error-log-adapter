@@ -144,22 +144,33 @@ describe('JsonFileErrorAdapter (ndjson mode)', () => {
     spy.mockRestore();
   });
 
-  it('returns a failure result, without touching the file, if the cause cannot be serialized', async () => {
+  it('stores an entry whose cause is circular, marking the loop', async () => {
     const fs = new FakeFileSystem();
     const circular: Record<string, unknown> = {};
     circular['self'] = circular;
-    const spy = silenceConsole();
 
     const result = await new JsonFileErrorAdapter('/l/e.ndjson', { fs }).log({
       ...entry('x'),
       cause: circular,
     });
 
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain('circular');
-    expect(fs.files.size).toBe(0);
-    spy.mockRestore();
+    expect(result).toEqual({ ok: true });
+    expect([...fs.files.values()].join('')).toContain('[Circular]');
   });
+
+  it.each(['C:\\error.log', 'C:/error.log', '\\error.log', '/error.log'])(
+    'does not try to create the root folder of %s',
+    async (filePath: string) => {
+      const fs = new FakeFileSystem();
+
+      const result = await new JsonFileErrorAdapter(filePath, { fs }).log(
+        entry('a')
+      );
+
+      expect(result).toEqual({ ok: true });
+      expect(fs.directories).toEqual([]);
+    }
+  );
 
   it('skips mkdir for a bare file name or when createDirectory is false', async () => {
     const bare = new FakeFileSystem();
