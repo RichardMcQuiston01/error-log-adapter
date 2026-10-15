@@ -54,24 +54,52 @@ export interface SupabaseErrorOptions {
   prefix?: string;
 }
 
+/** Longest `code` or `source` an insert policy accepts, in characters. */
+export const POLICY_MAX_CODE_LENGTH = 255;
+/** Longest `message` an insert policy accepts, in characters. */
+export const POLICY_MAX_MESSAGE_LENGTH = 4096;
+/** Largest `cause` an insert policy accepts, in bytes of stored JSON. */
+export const POLICY_MAX_CAUSE_BYTES = 8192;
+
 export interface SupabaseSetupOptions {
   /**
-   * Postgres roles allowed to insert, for example `['anon', 'authenticated']`
-   * when the browser logs with the public key. Leave empty when only a server
-   * using the service role key logs: that role bypasses row level security.
+   * Postgres roles allowed to insert through the API, for example
+   * `['authenticated']`. Leave empty when only a server using the service role
+   * key logs: that role bypasses row level security, so it needs no policy, and
+   * its key must never be shipped to a browser.
+   *
+   * The generated policy only checks the size of each field. It does not tie a
+   * row to a user, so any holder of an allowed role's key can still add entries
+   * of their own making: forged entries can hide real incidents, and a flood of
+   * them uses up your database quota. Prefer `authenticated` over `anon`.
    */
   insertRoles?: string[];
+  /**
+   * Required to allow `anon` (or `public`) to insert. The `anon` key is part of
+   * your frontend, so this lets anyone who loads the page write to the log.
+   * Defaults to `false`.
+   */
+  allowPublicInsert?: boolean;
 }
 
 const IDENTIFIER_PATTERN: RegExp = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/** The `WITH CHECK` condition of the insert policy: every field must be a reasonable size. */
+const INSERT_POLICY_CHECK: string =
+  `char_length(code) <= ${POLICY_MAX_CODE_LENGTH} ` +
+  `AND char_length(message) <= ${POLICY_MAX_MESSAGE_LENGTH} ` +
+  `AND (source IS NULL OR char_length(source) <= ${POLICY_MAX_CODE_LENGTH}) ` +
+  `AND (cause IS NULL OR pg_column_size(cause) <= ${POLICY_MAX_CAUSE_BYTES})`;
 
 /**
  * Returns the SQL to run once in the Supabase SQL editor: the error log table,
  * with row level security turned on (as Supabase recommends for every table in
  * an exposed schema) and, optionally, an insert-only policy for the given roles.
- * Nobody but the service role can read the log through the API.
+ * The policy limits the size of each field. Nobody but the service role can read
+ * the log through the API.
  *
- * @throws {RangeError} if the table name or a role is not a plain identifier.
+ * @throws {RangeError} if the table name or a role is not a plain identifier, or
+ * `anon` / `public` is listed without `allowPublicInsert: true`.
  */
 export function buildSupabaseSetupSql(
   tableName: string = DEFAULT_TABLE_NAME,
@@ -84,6 +112,14 @@ export function buildSupabaseSetupSql(
         `buildSupabaseSetupSql: invalid role name "${role}". Use only letters, digits and underscores, and do not start with a digit.`
       );
     }
+    if (
+      (role.toLowerCase() === 'anon' || role.toLowerCase() === 'public') &&
+      options.allowPublicInsert !== true
+    ) {
+      throw new RangeError(
+        `buildSupabaseSetupSql: role "${role}" would let anyone who loads your page write to the log, because the anon key is public. Use "authenticated" instead, or pass allowPublicInsert: true to accept the risk of forged entries and quota use.`
+      );
+    }
   }
   const statements: string[] = [
     ...buildErrorLogTableDdl('postgres', tableName),
@@ -93,7 +129,7 @@ export function buildSupabaseSetupSql(
     const policy: string = `${tableName}_insert_only`;
     statements.push(
       `DROP POLICY IF EXISTS "${policy}" ON "${tableName}"`,
-      `CREATE POLICY "${policy}" ON "${tableName}" FOR INSERT TO ${insertRoles.map((role: string): string => `"${role}"`).join(', ')} WITH CHECK (true)`
+      `CREATE POLICY "${policy}" ON "${tableName}" FOR INSERT TO ${insertRoles.map((role: string): string => `"${role}"`).join(', ')} WITH CHECK (${INSERT_POLICY_CHECK})`
     );
   }
   return statements;
