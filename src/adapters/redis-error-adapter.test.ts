@@ -123,21 +123,18 @@ describe('RedisErrorAdapter (list mode)', () => {
     spy.mockRestore();
   });
 
-  it('returns a failure result, without sending anything, if the cause cannot be serialized', async () => {
+  it('stores an entry whose cause is circular, marking the loop', async () => {
     const { client, sendCommand } = fakeClient();
     const circular: Record<string, unknown> = {};
     circular['self'] = circular;
-    const spy = silenceConsole();
 
     const result = await new RedisErrorAdapter(client).log({
       ...ENTRY,
       cause: circular,
     });
 
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain('circular');
-    expect(sendCommand).not.toHaveBeenCalled();
-    spy.mockRestore();
+    expect(result).toEqual({ ok: true });
+    expect(JSON.stringify(sendCommand.mock.calls)).toContain('[Circular]');
   });
 });
 

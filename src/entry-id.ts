@@ -1,4 +1,5 @@
 import type { ErrorLogEntry } from './types.js';
+import { generateId } from './uuid.js';
 
 const UUID_PATTERN: RegExp =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -17,7 +18,7 @@ export function hasCallerId(entry: ErrorLogEntry): boolean {
  */
 export function resolveEntryId(entry: ErrorLogEntry): string {
   if (entry.id === undefined) {
-    return crypto.randomUUID();
+    return generateId();
   }
   if (typeof entry.id !== 'string' || !UUID_PATTERN.test(entry.id)) {
     throw new RangeError(

@@ -123,20 +123,18 @@ describe('SqliteErrorAdapter', () => {
     spy.mockRestore();
   });
 
-  it('returns a failure result if the cause cannot be serialized', async () => {
+  it('stores an entry whose cause is circular, marking the loop', async () => {
     const circular: Record<string, unknown> = {};
     circular['self'] = circular;
     const run = vi.fn<[string, unknown[]], unknown>();
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const result = await new SqliteErrorAdapter({ run }).log({
       ...ENTRY,
       cause: circular,
     });
 
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain('circular');
-    spy.mockRestore();
+    expect(result).toEqual({ ok: true });
+    expect(JSON.stringify(run.mock.calls)).toContain('[Circular]');
   });
 
   it.each(['error log', 'x; DROP TABLE y', '1table', ''])(
