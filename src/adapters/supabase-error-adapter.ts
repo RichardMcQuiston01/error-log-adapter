@@ -1,3 +1,4 @@
+import { resolveTimeoutMs, timeoutMessage, withTimeout } from '../timeout.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
@@ -52,6 +53,12 @@ export interface SupabaseErrorOptions {
   tableName?: string;
   /** Text printed before failure messages. Defaults to `[error-log-adapter]`. */
   prefix?: string;
+  /**
+   * How long `log` waits for Supabase to answer before giving up, in milliseconds. Defaults
+   * to 10000. Pass `Infinity` to wait without limit. The call cannot be
+   * cancelled, so it may still finish after `log` has returned a failure.
+   */
+  timeoutMs?: number;
 }
 
 export interface SupabaseSetupOptions {
@@ -147,8 +154,9 @@ export class SupabaseErrorAdapter<
 > implements ErrorLogAdapter<TCode> {
   private readonly tableName: string;
   private readonly prefix: string;
+  private readonly timeoutMs: number;
 
-  /** @throws {RangeError} if `options.tableName` is empty. */
+  /** @throws {RangeError} if `options.tableName` is empty or `options.timeoutMs` is invalid. */
   constructor(
     private readonly client: SupabaseClientLike,
     options: SupabaseErrorOptions = {}
@@ -160,6 +168,10 @@ export class SupabaseErrorAdapter<
       );
     }
     this.prefix = options.prefix ?? '[error-log-adapter]';
+    this.timeoutMs = resolveTimeoutMs(
+      options.timeoutMs,
+      'SupabaseErrorAdapter'
+    );
   }
 
   async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
@@ -173,9 +185,12 @@ export class SupabaseErrorAdapter<
         source: serialized.source ?? null,
         occurred_at: serialized.timestamp,
       };
-      const result: SupabaseInsertResult = await this.client
-        .from(this.tableName)
-        .insert(row);
+      const result: SupabaseInsertResult = await withTimeout(
+        (): PromiseLike<SupabaseInsertResult> =>
+          this.client.from(this.tableName).insert(row),
+        this.timeoutMs,
+        timeoutMessage('Supabase', this.timeoutMs)
+      );
       if (result.error) {
         console.error(`${this.prefix} SupabaseErrorAdapter:`, result);
         return this.fail(describeSupabaseError(result));
