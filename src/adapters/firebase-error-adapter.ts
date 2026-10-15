@@ -1,3 +1,9 @@
+import { generateId } from '../uuid.js';
+import {
+  DEFAULT_TIMEOUT_MS,
+  resolveTimeoutMs,
+  withTimeout,
+} from '../timeout.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
@@ -53,7 +59,7 @@ export interface RealtimeDatabaseRefLike {
 }
 
 /** Default time to wait for a write to be saved, in milliseconds. */
-export const DEFAULT_WRITE_TIMEOUT_MS = 10_000;
+export const DEFAULT_WRITE_TIMEOUT_MS: number = DEFAULT_TIMEOUT_MS;
 
 export interface FirebaseErrorOptions {
   /**
@@ -71,47 +77,15 @@ export interface FirebaseErrorOptions {
   prefix?: string;
 }
 
-function resolveTimeout(
-  options: FirebaseErrorOptions,
-  adapter: string
-): number {
-  const timeoutMs: number = options.timeoutMs ?? DEFAULT_WRITE_TIMEOUT_MS;
-  if (Number.isNaN(timeoutMs) || timeoutMs <= 0) {
-    throw new RangeError(
-      `${adapter}: timeoutMs must be a positive number or Infinity, received ${String(options.timeoutMs)}.`
-    );
-  }
-  return timeoutMs;
-}
-
 /** Waits for the write, but rejects with a descriptive error if it takes longer than `timeoutMs`. */
 function waitForWrite(
-  write: PromiseLike<unknown>,
+  start: () => PromiseLike<unknown>,
   timeoutMs: number
 ): Promise<unknown> {
-  if (timeoutMs === Infinity) {
-    return Promise.resolve(write);
-  }
-  return new Promise<unknown>(
-    (resolve: (value: unknown) => void, reject: (reason: unknown) => void) => {
-      const timer = setTimeout((): void => {
-        reject(
-          new Error(
-            `the write was not saved within ${timeoutMs} ms (the connection may be down; the SDK keeps the write queued and may still save it later, so logging the entry again could store it twice)`
-          )
-        );
-      }, timeoutMs);
-      write.then(
-        (value: unknown): void => {
-          clearTimeout(timer);
-          resolve(value);
-        },
-        (reason: unknown): void => {
-          clearTimeout(timer);
-          reject(reason);
-        }
-      );
-    }
+  return withTimeout(
+    start,
+    timeoutMs,
+    `the write was not saved within ${timeoutMs} ms (the connection may be down; the SDK keeps the write queued and may still save it later, so logging the entry again could store it twice)`
   );
 }
 
@@ -120,7 +94,7 @@ function buildRecord<TCode extends string>(
 ): FirebaseErrorRecord {
   const serialized = serializeEntry(entry);
   const record: FirebaseErrorRecord = {
-    id: crypto.randomUUID(),
+    id: generateId(),
     code: serialized.code,
     message: serialized.message,
     timestamp: serialized.timestamp,
@@ -153,14 +127,17 @@ export class FirestoreErrorAdapter<
     options: FirebaseErrorOptions = {}
   ) {
     this.prefix = options.prefix ?? '[error-log-adapter]';
-    this.timeoutMs = resolveTimeout(options, 'FirestoreErrorAdapter');
+    this.timeoutMs = resolveTimeoutMs(
+      options.timeoutMs,
+      'FirestoreErrorAdapter'
+    );
   }
 
   async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
     try {
       const record: FirebaseErrorRecord = buildRecord(entry);
       await waitForWrite(
-        this.collection.doc(record.id).set(record),
+        () => this.collection.doc(record.id).set(record),
         this.timeoutMs
       );
       return { ok: true };
@@ -190,15 +167,16 @@ export class RealtimeDatabaseErrorAdapter<
     options: FirebaseErrorOptions = {}
   ) {
     this.prefix = options.prefix ?? '[error-log-adapter]';
-    this.timeoutMs = resolveTimeout(options, 'RealtimeDatabaseErrorAdapter');
+    this.timeoutMs = resolveTimeoutMs(
+      options.timeoutMs,
+      'RealtimeDatabaseErrorAdapter'
+    );
   }
 
   async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
     try {
-      await waitForWrite(
-        this.reference.push(buildRecord(entry)),
-        this.timeoutMs
-      );
+      const record: FirebaseErrorRecord = buildRecord(entry);
+      await waitForWrite(() => this.reference.push(record), this.timeoutMs);
       return { ok: true };
     } catch (error: unknown) {
       console.error(`${this.prefix} RealtimeDatabaseErrorAdapter:`, error);

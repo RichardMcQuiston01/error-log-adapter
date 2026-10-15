@@ -134,6 +134,20 @@ describe('FlatFileErrorAdapter', () => {
     expect(fs.directories).toEqual(['/var/log/app']);
   });
 
+  it.each(['C:\\error.log', 'C:/error.log', '\\error.log', '/error.log'])(
+    'does not try to create the root folder of %s',
+    async (filePath: string) => {
+      const fs = new FakeFileSystem();
+
+      const result = await new FlatFileErrorAdapter(filePath, { fs }).log(
+        entry('a')
+      );
+
+      expect(result).toEqual({ ok: true });
+      expect(fs.directories).toEqual([]);
+    }
+  );
+
   it('skips mkdir for a bare file name or when createDirectory is false', async () => {
     const bare = new FakeFileSystem();
     await new FlatFileErrorAdapter('errors.log', { fs: bare }).log(entry('a'));

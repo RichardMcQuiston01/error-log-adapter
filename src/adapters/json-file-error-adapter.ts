@@ -1,3 +1,4 @@
+import { generateId } from '../uuid.js';
 import {
   isMissingFileError,
   loadNodeFileSystem,
@@ -98,7 +99,7 @@ export class JsonFileErrorAdapter<
   private async write(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
     try {
       const record: JsonFileErrorRecord = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         ...serializeEntry(entry),
       };
       const fs: ReadWriteFileSystemLike = await this.getFileSystem();

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import type { ErrorLogEntry } from '../types.js';
 import {
@@ -141,5 +141,142 @@ describe('createErrorLogStore', () => {
     createErrorLogStore(database);
 
     expect(createObjectStore).not.toHaveBeenCalled();
+  });
+});
+
+/** A fake whose pieces the test fires by hand, with spy-able events. */
+function manualDatabase(options: { requestless?: boolean } = {}) {
+  const request = {
+    onerror: null as ((event: never) => unknown) | null,
+    error: null as { name?: string; message?: string } | null,
+  };
+  const tx = {
+    oncomplete: null as ((event: never) => unknown) | null,
+    onerror: null as ((event: never) => unknown) | null,
+    onabort: null as ((event: never) => unknown) | null,
+    error: null as { name?: string; message?: string } | null,
+    objectStore: () => ({
+      add: (): unknown => (options.requestless ? undefined : request),
+    }),
+  };
+  const database: IdbDatabaseLike = { transaction: () => tx };
+  const event = () => ({ preventDefault: vi.fn(), stopPropagation: vi.fn() });
+  return { database, request, tx, event };
+}
+
+describe('IndexedDbErrorAdapter error handling', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('reports the request error details and keeps the event from reaching the app', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { database, request, event } = manualDatabase();
+    const pending = new IndexedDbErrorAdapter(database).log(ENTRY);
+    await Promise.resolve();
+
+    request.error = {
+      name: 'ConstraintError',
+      message: 'Unable to add key to index',
+    };
+    const fired = event();
+    request.onerror?.(fired as never);
+    const result = await pending;
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain(
+      'request failed: ConstraintError: Unable to add key to index'
+    );
+    expect(fired.preventDefault).toHaveBeenCalled();
+    expect(fired.stopPropagation).toHaveBeenCalled();
+  });
+
+  it.each([
+    ['onerror', 'transaction failed'],
+    ['onabort', 'transaction aborted'],
+  ] as const)(
+    'handles the transaction %s event without letting it propagate',
+    async (slot, text) => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const { database, tx, event } = manualDatabase({ requestless: true });
+      const pending = new IndexedDbErrorAdapter(database).log(ENTRY);
+      await Promise.resolve();
+
+      tx.error = { name: 'QuotaExceededError', message: 'full' };
+      const fired = event();
+      tx[slot]?.(fired as never);
+      const result = await pending;
+
+      expect(result.error).toContain(`${text}: QuotaExceededError: full`);
+      expect(fired.preventDefault).toHaveBeenCalled();
+      expect(fired.stopPropagation).toHaveBeenCalled();
+    }
+  );
+
+  it('says when the browser gave no details', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { database, tx } = manualDatabase({ requestless: true });
+    const pending = new IndexedDbErrorAdapter(database).log(ENTRY);
+    await Promise.resolve();
+    tx.onabort?.(undefined as never);
+    expect((await pending).error).toContain(
+      'transaction aborted: no details provided'
+    );
+  });
+
+  it('returns ok: false instead of throwing when add throws', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const database: IdbDatabaseLike = {
+      transaction: () => ({
+        oncomplete: null,
+        onerror: null,
+        onabort: null,
+        objectStore: () => ({
+          add: (): never => {
+            throw new Error('DataError: bad key');
+          },
+        }),
+      }),
+    };
+    const result = await new IndexedDbErrorAdapter(database).log(ENTRY);
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('DataError: bad key');
+  });
+
+  it('gives up when the transaction never finishes', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { database } = manualDatabase();
+
+    const pending = new IndexedDbErrorAdapter(database).log(ENTRY);
+    await vi.advanceTimersByTimeAsync(10_000);
+    const result = await pending;
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain(
+      'IndexedDB did not finish the transaction within 10000 ms'
+    );
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('uses a custom timeoutMs and clears the timer when the write completes', async () => {
+    vi.useFakeTimers();
+    const { database, tx } = manualDatabase();
+    const pending = new IndexedDbErrorAdapter(database, {
+      timeoutMs: 250,
+    }).log(ENTRY);
+    await Promise.resolve();
+    tx.oncomplete?.(undefined as never);
+
+    expect(await pending).toEqual({ ok: true });
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each([0, -1, NaN])('rejects timeoutMs %s', (value: number) => {
+    const { database } = manualDatabase();
+    expect(
+      () => new IndexedDbErrorAdapter(database, { timeoutMs: value })
+    ).toThrow(/IndexedDbErrorAdapter: timeoutMs must be a positive number/);
   });
 });

@@ -1,3 +1,5 @@
+import { generateId } from '../uuid.js';
+import { resolveTimeoutMs, timeoutMessage, withTimeout } from '../timeout.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
@@ -63,6 +65,13 @@ export interface S3ErrorOptions {
   batch?: S3BatchOptions;
   /** Text printed before failure messages. Defaults to `[error-log-adapter]`. */
   prefix?: string;
+  /**
+   * How long an upload may take before `log` (or `flush`) gives up waiting, in
+   * milliseconds. Defaults to 10000. Pass `Infinity` to wait without limit. The
+   * upload cannot be cancelled, so it may still finish afterwards; in batch mode
+   * the entries stay buffered and are uploaded again by the next flush.
+   */
+  timeoutMs?: number;
 }
 
 interface S3Record {
@@ -102,6 +111,7 @@ export class S3ErrorAdapter<
   private readonly contentType: string;
   private readonly batch: S3BatchOptions | undefined;
   private readonly logPrefix: string;
+  private readonly timeoutMs: number;
   private buffer: S3Record[] = [];
   private timer: ReturnType<typeof setTimeout> | null = null;
   private flushQueue: Promise<unknown> = Promise.resolve();
@@ -118,6 +128,7 @@ export class S3ErrorAdapter<
       options.contentType ??
       (this.batch === undefined ? 'application/json' : 'application/x-ndjson');
     this.logPrefix = options.prefix ?? '[error-log-adapter]';
+    this.timeoutMs = resolveTimeoutMs(options.timeoutMs, 'S3ErrorAdapter');
     if (bucket === '') {
       throw new RangeError('S3ErrorAdapter: bucket must not be empty.');
     }
@@ -141,7 +152,7 @@ export class S3ErrorAdapter<
   async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
     try {
       const record: S3Record = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         ...serializeEntry(entry),
       };
       const occurredAt: Date = new Date(record.timestamp);
@@ -216,7 +227,7 @@ export class S3ErrorAdapter<
       return { ok: true };
     }
     try {
-      const key: string = `${this.keyPrefix}${datePath(new Date())}-${crypto.randomUUID()}.ndjson`;
+      const key: string = `${this.keyPrefix}${datePath(new Date())}-${generateId()}.ndjson`;
       const body: string = pending
         .map((record: S3Record): string => JSON.stringify(record))
         .join('\n');
@@ -235,12 +246,17 @@ export class S3ErrorAdapter<
   }
 
   private upload(key: string, body: string): Promise<unknown> {
-    return this.client.putObject({
-      Bucket: this.bucket,
-      Key: key,
-      Body: body,
-      ContentType: this.contentType,
-    });
+    return withTimeout(
+      (): Promise<unknown> =>
+        this.client.putObject({
+          Bucket: this.bucket,
+          Key: key,
+          Body: body,
+          ContentType: this.contentType,
+        }),
+      this.timeoutMs,
+      timeoutMessage('S3', this.timeoutMs)
+    );
   }
 
   private fail(error: unknown, bufferedCount?: number): ErrorLogResult {
