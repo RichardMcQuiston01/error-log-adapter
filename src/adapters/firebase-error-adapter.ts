@@ -1,3 +1,4 @@
+import { generateId } from '../uuid.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
@@ -119,7 +120,7 @@ function buildRecord<TCode extends string>(
 ): FirebaseErrorRecord {
   const serialized = serializeEntry(entry);
   const record: FirebaseErrorRecord = {
-    id: crypto.randomUUID(),
+    id: generateId(),
     code: serialized.code,
     message: serialized.message,
     timestamp: serialized.timestamp,

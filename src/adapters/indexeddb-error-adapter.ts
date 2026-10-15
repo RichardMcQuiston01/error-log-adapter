@@ -1,3 +1,4 @@
+import { generateId } from '../uuid.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type { SerializedErrorLogEntry } from '../serialize.js';
 import type {
@@ -85,7 +86,7 @@ export class IndexedDbErrorAdapter<
   async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
     try {
       const record: IndexedDbErrorRecord = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         ...serializeEntry(entry),
       };
       await this.write(record);

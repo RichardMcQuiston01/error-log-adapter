@@ -1,3 +1,4 @@
+import { generateId } from '../uuid.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
@@ -166,7 +167,7 @@ export class SupabaseErrorAdapter<
     try {
       const serialized = serializeEntry(entry);
       const row: SupabaseErrorRow = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         code: serialized.code,
         message: serialized.message,
         cause: serialized.cause === undefined ? null : serialized.cause,

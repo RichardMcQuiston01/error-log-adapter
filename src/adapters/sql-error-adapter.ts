@@ -1,3 +1,4 @@
+import { generateId } from '../uuid.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
@@ -137,7 +138,7 @@ abstract class SqlErrorAdapter<
         );
       }
       const params: unknown[] = [
-        crypto.randomUUID(),
+        generateId(),
         serialized.code,
         serialized.message,
         serialized.cause === undefined

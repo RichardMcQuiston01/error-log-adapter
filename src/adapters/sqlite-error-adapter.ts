@@ -1,3 +1,4 @@
+import { generateId } from '../uuid.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
@@ -92,7 +93,7 @@ export class SqliteErrorAdapter<
       await this.client.run(
         `INSERT INTO ${this.tableName} (id, code, message, cause, source, occurred_at) VALUES (?, ?, ?, ?, ?, ?)`,
         [
-          crypto.randomUUID(),
+          generateId(),
           serialized.code,
           serialized.message,
           serialized.cause === undefined
