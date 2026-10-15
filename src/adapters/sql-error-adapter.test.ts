@@ -156,18 +156,15 @@ describe.each([
     spy.mockRestore();
   });
 
-  it('fails without touching the database if the cause cannot be serialized', async () => {
+  it('stores an entry whose cause is circular, marking the loop', async () => {
     const { client, query } = fakeClient();
     const circular: Record<string, unknown> = {};
     circular['self'] = circular;
-    const spy = silenceConsole();
 
     const result = await create(client).log({ ...ENTRY, cause: circular });
 
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain('circular');
-    expect(query).not.toHaveBeenCalled();
-    spy.mockRestore();
+    expect(result).toEqual({ ok: true });
+    expect(JSON.stringify(query.mock.calls)).toContain('[Circular]');
   });
 
   it.each(['error log', 'x"; DROP TABLE y; --', '1table', '', 'a'.repeat(48)])(

@@ -119,20 +119,30 @@ describe('S3ErrorAdapter (one object per entry)', () => {
     spy.mockRestore();
   });
 
-  it('fails without uploading for an invalid timestamp or an unserializable cause', async () => {
+  it('fails without uploading for an invalid timestamp', async () => {
     const { client, putObject } = fakeClient();
-    const circular: Record<string, unknown> = {};
-    circular['self'] = circular;
     const spy = silenceConsole();
     const adapter = new S3ErrorAdapter(client, 'b');
 
     const badTime = await adapter.log({ ...ENTRY, timestamp: 'last tuesday' });
-    const badCause = await adapter.log({ ...ENTRY, cause: circular });
 
     expect(badTime.error).toContain('"last tuesday" is not a valid ISO 8601');
-    expect(badCause.error).toContain('circular');
     expect(putObject).not.toHaveBeenCalled();
     spy.mockRestore();
+  });
+
+  it('stores an entry whose cause is circular, marking the loop', async () => {
+    const { client, putObject } = fakeClient();
+    const circular: Record<string, unknown> = {};
+    circular['self'] = circular;
+
+    const result = await new S3ErrorAdapter(client, 'b').log({
+      ...ENTRY,
+      cause: circular,
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(JSON.stringify(putObject.mock.calls)).toContain('[Circular]');
   });
 });
 

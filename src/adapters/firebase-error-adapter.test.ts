@@ -154,18 +154,15 @@ describe.each([
     spy.mockRestore();
   });
 
-  it('returns a failure result, without writing, if the cause cannot be serialized', async () => {
+  it('stores an entry whose cause is circular, marking the loop', async () => {
     const { adapter, written } = setup();
     const circular: Record<string, unknown> = {};
     circular['self'] = circular;
-    const spy = silenceConsole();
 
     const result = await adapter().log({ ...ENTRY, cause: circular });
 
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain('circular');
-    expect(written()).toHaveLength(0);
-    spy.mockRestore();
+    expect(result).toEqual({ ok: true });
+    expect(written()[0].cause).toContain('[Circular]');
   });
 });
 
