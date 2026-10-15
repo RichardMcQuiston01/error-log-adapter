@@ -63,7 +63,8 @@ export interface FirebaseErrorOptions {
    * The Firebase SDKs keep writes queued while the connection is down, and
    * their promises stay pending until it returns, so without a limit `log`
    * could hang for as long as an outage lasts. A write that timed out is still
-   * queued by the SDK and may be saved later.
+   * queued by the SDK and may be saved later, so do not retry a timeout if a
+   * duplicate entry would matter.
    */
   timeoutMs?: number;
   /** Text printed before failure messages. Defaults to `[error-log-adapter]`. */
@@ -96,7 +97,7 @@ function waitForWrite(
       const timer = setTimeout((): void => {
         reject(
           new Error(
-            `the write was not saved within ${timeoutMs} ms (the connection may be down; the SDK keeps the write queued and may still save it later)`
+            `the write was not saved within ${timeoutMs} ms (the connection may be down; the SDK keeps the write queued and may still save it later, so logging the entry again could store it twice)`
           )
         );
       }, timeoutMs);
@@ -135,7 +136,10 @@ function buildRecord<TCode extends string>(
 
 /**
  * Writes each entry as a document in a Firestore collection. The document id is
- * the entry's UUID, so retrying a write never creates a duplicate.
+ * the entry's UUID, so the SDK finishing one queued write twice cannot create two
+ * documents. Calling `log` again is a new write with a new UUID: if a call
+ * reported a timeout, the first write may still be saved later, and logging the
+ * same entry again can store it twice.
  */
 export class FirestoreErrorAdapter<
   TCode extends string = string,
