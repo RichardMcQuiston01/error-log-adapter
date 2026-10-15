@@ -1,9 +1,5 @@
 # CHANGELOG
 
-## Unreleased
-
-- Fixed: `serializeEntry` / `serializeCause` no longer lose or reject causes. Nested `Error.cause` chains and `AggregateError.errors` are kept, an `Error` inside a plain object or array (or from another realm) is no longer stored as `{}`, and circular references, `BigInt`, `Symbol`, functions and throwing getters become short string markers (`[Circular]`, `[Truncated]` past 6 levels) instead of making `log()` return `ok: false`. Entries with such causes are now stored by every adapter.
-
 ## 0.4.0
 
 - `SupabaseErrorAdapter` writes entries to a Supabase table through `supabase-js` (any client with `from(table).insert(row)` works). Rows use the same columns as the Postgres adapter's `error_log` table. `supabase-js` returns failures instead of throwing, so the adapter reads the returned error and reports its message, code, details and hint, or the HTTP status when the error has no message. `buildSupabaseSetupSql` returns the SQL to run once in the Supabase SQL editor: the table, row level security, and an optional insert-only policy for roles such as `anon`. Checked against a real PostgREST server with `supabase-js` 2.118, including a row level security rejection, a missing table, a bad key and an unreachable server.
