@@ -1,3 +1,4 @@
+import { resolveEntryId } from '../entry-id.js';
 import { generateId } from '../uuid.js';
 import { resolveTimeoutMs, timeoutMessage, withTimeout } from '../timeout.js';
 import { describeError, serializeEntry } from '../serialize.js';
@@ -152,7 +153,7 @@ export class S3ErrorAdapter<
   async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
     try {
       const record: S3Record = {
-        id: generateId(),
+        id: resolveEntryId(entry),
         ...serializeEntry(entry),
       };
       const occurredAt: Date = new Date(record.timestamp);

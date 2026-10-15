@@ -1,4 +1,4 @@
-import { generateId } from '../uuid.js';
+import { hasCallerId, resolveEntryId } from '../entry-id.js';
 import {
   DEFAULT_TIMEOUT_MS,
   resolveTimeoutMs,
@@ -51,11 +51,19 @@ export interface FirestoreCollectionLike {
  * ```ts
  * const refLike: RealtimeDatabaseRefLike = {
  *   push: (value) => push(ref(db, 'error_log'), value),
+ *   child: (key) => ({ set: (value) => set(ref(db, `error_log/${key}`), value) }),
  * };
  * ```
+ *
+ * `child(key).set(value)` is only needed for entries that carry their own `id`
+ * (see `ErrorLogEntry.id`): they are written under that key, so logging the same
+ * entry again overwrites the record instead of adding a second one.
  */
 export interface RealtimeDatabaseRefLike {
   push(value: FirebaseErrorRecord): PromiseLike<unknown>;
+  child?(key: string): {
+    set(value: FirebaseErrorRecord): PromiseLike<unknown>;
+  };
 }
 
 /** Default time to wait for a write to be saved, in milliseconds. */
@@ -69,8 +77,9 @@ export interface FirebaseErrorOptions {
    * The Firebase SDKs keep writes queued while the connection is down, and
    * their promises stay pending until it returns, so without a limit `log`
    * could hang for as long as an outage lasts. A write that timed out is still
-   * queued by the SDK and may be saved later, so do not retry a timeout if a
-   * duplicate entry would matter.
+   * queued by the SDK and may be saved later. Retry a timeout only with the same
+   * `ErrorLogEntry.id`, so the retry overwrites the first write instead of
+   * adding a second one.
    */
   timeoutMs?: number;
   /** Text printed before failure messages. Defaults to `[error-log-adapter]`. */
@@ -85,7 +94,7 @@ function waitForWrite(
   return withTimeout(
     start,
     timeoutMs,
-    `the write was not saved within ${timeoutMs} ms (the connection may be down; the SDK keeps the write queued and may still save it later, so logging the entry again could store it twice)`
+    `the write was not saved within ${timeoutMs} ms (the connection may be down; the SDK keeps the write queued and may still save it later, so logging the entry again could store it twice unless it carries an id)`
   );
 }
 
@@ -94,7 +103,7 @@ function buildRecord<TCode extends string>(
 ): FirebaseErrorRecord {
   const serialized = serializeEntry(entry);
   const record: FirebaseErrorRecord = {
-    id: generateId(),
+    id: resolveEntryId(entry),
     code: serialized.code,
     message: serialized.message,
     timestamp: serialized.timestamp,
@@ -111,9 +120,10 @@ function buildRecord<TCode extends string>(
 /**
  * Writes each entry as a document in a Firestore collection. The document id is
  * the entry's UUID, so the SDK finishing one queued write twice cannot create two
- * documents. Calling `log` again is a new write with a new UUID: if a call
- * reported a timeout, the first write may still be saved later, and logging the
- * same entry again can store it twice.
+ * documents. Calling `log` again without an `id` on the entry is a new write
+ * with a new UUID: if a call reported a timeout, the first write may still be
+ * saved later, and logging the same entry again can store it twice. Give the
+ * entry an `id` and the retry overwrites the same document.
  */
 export class FirestoreErrorAdapter<
   TCode extends string = string,
@@ -176,7 +186,18 @@ export class RealtimeDatabaseErrorAdapter<
   async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
     try {
       const record: FirebaseErrorRecord = buildRecord(entry);
-      await waitForWrite(() => this.reference.push(record), this.timeoutMs);
+      let write: PromiseLike<unknown>;
+      if (hasCallerId(entry)) {
+        if (this.reference.child === undefined) {
+          throw new TypeError(
+            'the entry has an id, which needs a reference with child(key).set(value) so a repeat overwrites the first write; add child to the reference or log without an id'
+          );
+        }
+        write = this.reference.child(record.id).set(record);
+      } else {
+        write = this.reference.push(record);
+      }
+      await waitForWrite(() => write, this.timeoutMs);
       return { ok: true };
     } catch (error: unknown) {
       console.error(`${this.prefix} RealtimeDatabaseErrorAdapter:`, error);

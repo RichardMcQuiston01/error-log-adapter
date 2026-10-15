@@ -1,4 +1,4 @@
-import { generateId } from '../uuid.js';
+import { hasCallerId, resolveEntryId } from '../entry-id.js';
 import { resolveTimeoutMs, timeoutMessage, withTimeout } from '../timeout.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type { SerializedErrorLogEntry } from '../serialize.js';
@@ -36,6 +36,12 @@ export interface IdbRequestLike {
 export interface IdbObjectStoreLike {
   /** Returns an `IDBRequest`. Fakes that return nothing also work. */
   add(value: unknown): unknown;
+  /**
+   * Replaces the record with the same key. Used for entries that carry their own
+   * `id`, so logging one again does not fail on the existing key. A real
+   * `IDBObjectStore` has it; a fake without it falls back to `add`.
+   */
+  put?(value: unknown): unknown;
 }
 
 /** The subset of an `IDBTransaction` this adapter uses. */
@@ -119,10 +125,10 @@ export class IndexedDbErrorAdapter<
   async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
     try {
       const record: IndexedDbErrorRecord = {
-        id: generateId(),
+        id: resolveEntryId(entry),
         ...serializeEntry(entry),
       };
-      await this.write(record);
+      await this.write(record, hasCallerId(entry));
       return { ok: true };
     } catch (error: unknown) {
       console.error(`${this.prefix} IndexedDbErrorAdapter:`, error);
@@ -141,7 +147,10 @@ export class IndexedDbErrorAdapter<
    * failed log write does not reach the `onerror` handler an app may have set on
    * its own database object.
    */
-  private write(record: IndexedDbErrorRecord): Promise<void> {
+  private write(
+    record: IndexedDbErrorRecord,
+    replaceExisting: boolean
+  ): Promise<void> {
     return withTimeout(
       (): Promise<void> =>
         new Promise<void>(
@@ -160,9 +169,13 @@ export class IndexedDbErrorAdapter<
             transaction.oncomplete = (): void => resolve();
             transaction.onerror = fail('transaction failed', transaction);
             transaction.onabort = fail('transaction aborted', transaction);
-            const request: unknown = transaction
-              .objectStore(this.storeName)
-              .add(record);
+            const store: IdbObjectStoreLike = transaction.objectStore(
+              this.storeName
+            );
+            const request: unknown =
+              replaceExisting && typeof store.put === 'function'
+                ? store.put(record)
+                : store.add(record);
             if (typeof request === 'object' && request !== null) {
               // The request error holds the details (for example a
               // ConstraintError); the transaction's own error is null for it.

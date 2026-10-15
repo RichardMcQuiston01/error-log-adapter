@@ -1,4 +1,4 @@
-import { generateId } from '../uuid.js';
+import { hasCallerId, resolveEntryId } from '../entry-id.js';
 import { resolveTimeoutMs, timeoutMessage, withTimeout } from '../timeout.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type {
@@ -215,7 +215,7 @@ export class SupabaseErrorAdapter<
     try {
       const serialized = serializeEntry(entry);
       const row: SupabaseErrorRow = {
-        id: generateId(),
+        id: resolveEntryId(entry),
         code: serialized.code,
         message: serialized.message,
         cause: serialized.cause === undefined ? null : serialized.cause,
@@ -229,6 +229,10 @@ export class SupabaseErrorAdapter<
         timeoutMessage('Supabase', this.timeoutMs)
       );
       if (result.error) {
+        if (hasCallerId(entry) && result.error.code === '23505') {
+          // Unique violation on the id: this entry was stored by an earlier call.
+          return { ok: true };
+        }
         console.error(`${this.prefix} SupabaseErrorAdapter:`, result);
         return this.fail(describeSupabaseError(result));
       }

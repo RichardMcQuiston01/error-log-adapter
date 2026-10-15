@@ -1,4 +1,4 @@
-import { generateId } from '../uuid.js';
+import { resolveEntryId } from '../entry-id.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type { SerializedErrorLogEntry } from '../serialize.js';
 import type {
@@ -105,7 +105,7 @@ export class WebStorageErrorAdapter<
   async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
     try {
       const record: WebStorageErrorRecord = {
-        id: generateId(),
+        id: resolveEntryId(entry),
         ...serializeEntry(entry),
       };
       await this.appendLocked(record);
@@ -145,8 +145,11 @@ export class WebStorageErrorAdapter<
 
   /** Reads, appends, trims, and writes back. Runs without awaiting, so calls in one tab never interleave. */
   private append(record: WebStorageErrorRecord): void {
+    // An entry logged again with the same id replaces its earlier record.
     const records: WebStorageErrorRecord[] = [
-      ...this.readRecords(),
+      ...this.readRecords().filter(
+        (existing: WebStorageErrorRecord): boolean => existing?.id !== record.id
+      ),
       record,
     ].slice(-this.maxEntries);
     for (;;) {

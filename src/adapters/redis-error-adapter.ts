@@ -1,4 +1,4 @@
-import { generateId } from '../uuid.js';
+import { resolveEntryId } from '../entry-id.js';
 import { resolveTimeoutMs, timeoutMessage, withTimeout } from '../timeout.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type {
@@ -104,7 +104,7 @@ export class RedisErrorAdapter<
 
   async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
     try {
-      const record = { id: generateId(), ...serializeEntry(entry) };
+      const record = { id: resolveEntryId(entry), ...serializeEntry(entry) };
       if (this.mode === 'stream') {
         await this.send(this.buildStreamCommand(record));
       } else {

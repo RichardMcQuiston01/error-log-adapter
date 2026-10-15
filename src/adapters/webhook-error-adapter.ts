@@ -1,3 +1,4 @@
+import { hasCallerId, resolveEntryId } from '../entry-id.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import { resolveTimeoutMs, timeoutMessage } from '../timeout.js';
 import type {
@@ -92,7 +93,12 @@ export class WebhookErrorAdapter<
           'Content-Type': 'application/json',
           ...this.options.headers,
         },
-        body: JSON.stringify(serializeEntry(entry)),
+        // A caller-supplied id goes along so the receiver can drop a repeat.
+        body: JSON.stringify(
+          hasCallerId(entry)
+            ? { id: resolveEntryId(entry), ...serializeEntry(entry) }
+            : serializeEntry(entry)
+        ),
         // A redirect would turn the POST into a GET without a body (302, 303)
         // or re-send the entry and headers to another host (307, 308).
         redirect: 'manual',

@@ -1,4 +1,4 @@
-import { generateId } from '../uuid.js';
+import { resolveEntryId } from '../entry-id.js';
 import {
   isMissingFileError,
   loadNodeFileSystem,
@@ -99,7 +99,7 @@ export class JsonFileErrorAdapter<
   private async write(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
     try {
       const record: JsonFileErrorRecord = {
-        id: generateId(),
+        id: resolveEntryId(entry),
         ...serializeEntry(entry),
       };
       const fs: ReadWriteFileSystemLike = await this.getFileSystem();
@@ -146,8 +146,11 @@ export class JsonFileErrorAdapter<
     fs: ReadWriteFileSystemLike,
     record: JsonFileErrorRecord
   ): Promise<void> {
+    // An entry logged again with the same id replaces its earlier record.
     const records: JsonFileErrorRecord[] = [
-      ...(await this.readRecords(fs)),
+      ...(await this.readRecords(fs)).filter(
+        (existing: JsonFileErrorRecord): boolean => existing?.id !== record.id
+      ),
       record,
     ];
     const kept: JsonFileErrorRecord[] =

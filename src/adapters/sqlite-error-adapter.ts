@@ -1,4 +1,4 @@
-import { generateId } from '../uuid.js';
+import { resolveEntryId } from '../entry-id.js';
 import { resolveTimeoutMs, timeoutMessage, withTimeout } from '../timeout.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type {
@@ -100,9 +100,9 @@ export class SqliteErrorAdapter<
       await this.ensureTable();
       const serialized = serializeEntry(entry);
       await this.run(
-        `INSERT INTO ${this.tableName} (id, code, message, cause, source, occurred_at) VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO ${this.tableName} (id, code, message, cause, source, occurred_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO NOTHING`,
         [
-          generateId(),
+          resolveEntryId(entry),
           serialized.code,
           serialized.message,
           serialized.cause === undefined
