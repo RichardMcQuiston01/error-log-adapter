@@ -90,14 +90,28 @@ export function buildErrorLogTableDdl(
   return [
     `CREATE TABLE IF NOT EXISTS ${table} (` +
       'id CHAR(36) NOT NULL PRIMARY KEY, ' +
-      'code VARCHAR(255) NOT NULL, ' +
+      'code TEXT NOT NULL, ' +
       'message TEXT NOT NULL, ' +
       'cause JSON NULL, ' +
-      'source VARCHAR(255) NULL, ' +
+      'source TEXT NULL, ' +
       'occurred_at DATETIME(3) NOT NULL, ' +
       'created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3), ' +
       `INDEX ${index} (occurred_at)` +
       ')',
+  ];
+}
+
+/**
+ * Returns the statement that widens the `code` and `source` columns of a MySQL
+ * table created by `buildErrorLogTableDdl` in 0.4.0 or earlier, where they were
+ * `VARCHAR(255)` and a longer value made the insert fail. Run it once.
+ */
+export function buildMySqlWidenColumnsSql(
+  tableName: string = DEFAULT_TABLE_NAME
+): string[] {
+  assertValidTableName(tableName, 'buildMySqlWidenColumnsSql');
+  return [
+    `ALTER TABLE ${quoteIdentifier('mysql', tableName)} MODIFY code TEXT NOT NULL, MODIFY source TEXT NULL`,
   ];
 }
 

@@ -56,6 +56,7 @@ export {
   MySqlErrorAdapter,
   PostgresErrorAdapter,
   buildErrorLogTableDdl,
+  buildMySqlWidenColumnsSql,
 } from './adapters/sql-error-adapter.js';
 export type {
   SqlClientLike,

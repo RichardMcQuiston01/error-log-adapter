@@ -4,6 +4,7 @@ import {
   MySqlErrorAdapter,
   PostgresErrorAdapter,
   buildErrorLogTableDdl,
+  buildMySqlWidenColumnsSql,
 } from './sql-error-adapter.js';
 import type { SqlClientLike } from './sql-error-adapter.js';
 
@@ -208,6 +209,9 @@ describe('buildErrorLogTableDdl', () => {
     expect(statements[0]).toContain('CREATE TABLE IF NOT EXISTS `error_log`');
     expect(statements[0]).toContain('id CHAR(36) NOT NULL PRIMARY KEY');
     expect(statements[0]).toContain('cause JSON NULL');
+    expect(statements[0]).toContain('code TEXT NOT NULL');
+    expect(statements[0]).toContain('source TEXT NULL');
+    expect(statements[0]).not.toContain('VARCHAR');
     expect(statements[0]).toContain(
       'created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)'
     );
@@ -218,6 +222,20 @@ describe('buildErrorLogTableDdl', () => {
 
   it('validates the table name', () => {
     expect(() => buildErrorLogTableDdl('postgres', 'bad name')).toThrowError(
+      /invalid table name/
+    );
+  });
+});
+
+describe('buildMySqlWidenColumnsSql', () => {
+  it('modifies code and source to TEXT', () => {
+    expect(buildMySqlWidenColumnsSql('app_error')).toEqual([
+      'ALTER TABLE `app_error` MODIFY code TEXT NOT NULL, MODIFY source TEXT NULL',
+    ]);
+  });
+
+  it('validates the table name', () => {
+    expect(() => buildMySqlWidenColumnsSql('bad name')).toThrowError(
       /invalid table name/
     );
   });
