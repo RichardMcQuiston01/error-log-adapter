@@ -25,6 +25,11 @@ export interface S3PutObjectInput {
  * it is, and so does anything else that follows the S3 API, including
  * DigitalOcean Spaces, Cloudflare R2 and MinIO when you point the client at
  * their endpoint.
+ *
+ * Some S3-compatible providers reject the checksum headers that recent AWS SDK
+ * v3 versions add by default. If uploads fail with a checksum or header error,
+ * create the client with `requestChecksumCalculation: 'WHEN_REQUIRED'` and
+ * `responseChecksumValidation: 'WHEN_REQUIRED'`.
  */
 export interface S3ClientLike {
   putObject(input: S3PutObjectInput): Promise<unknown>;
