@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## 0.3.0
 
 - `S3ErrorAdapter` stores entries in S3 and S3-compatible buckets (DigitalOcean Spaces, Cloudflare R2, MinIO) through a one-method `putObject` client, which the AWS SDK v3 `S3` client already provides. By default each entry is its own JSON object keyed `<keyPrefix>YYYY/MM/DD/<timestamp>-<uuid>.json`. With `batch`, entries are buffered and uploaded together as one newline-delimited JSON object when `batchSize` is reached or `maxWaitMs` passes; `flush()` uploads what is buffered, and entries from a failed upload are kept and retried.
 - `RedisErrorAdapter` writes entries to Redis through a one-method `sendCommand(args)` client, which node-redis already provides (ioredis needs a one-line wrapper, shown in the docs). `list` mode (default) pushes one JSON record per entry with `RPUSH` or `LPUSH` and trims to `maxEntries` with `LTRIM`. `stream` mode appends each entry with `XADD` and an exact `MAXLEN` cap.
