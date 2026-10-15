@@ -25,6 +25,7 @@ Planned adapters, in priority order.
 - Redis: capped list or stream
 - S3 / DigitalOcean Spaces (and other S3-compatible stores): one object per entry or batched
 - Firebase: Firestore and Realtime Database
+- Supabase: through `supabase-js` (for a direct connection, use the Postgres adapter)
 
 ## Next Up
 
