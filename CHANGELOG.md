@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## Unreleased
+
+- `FirestoreErrorAdapter` and `RealtimeDatabaseErrorAdapter` write entries to Firebase. A `firebase-admin` Firestore collection or Realtime Database reference works as it is; the web SDK needs a small wrapper, shown in the docs. Firestore documents use the entry's UUID as their id, so a retried write cannot duplicate. The Realtime Database uses `push` keys, which sort by time. The cause is stored as a JSON string so no cause can break a write. Both give up with a clear error if a write is not saved within `timeoutMs` (default 10 seconds), because the Firebase SDKs queue writes while offline and would otherwise leave `log` waiting for the whole outage.
+
 ## 0.3.0
 
 - `S3ErrorAdapter` stores entries in S3 and S3-compatible buckets (DigitalOcean Spaces, Cloudflare R2, MinIO) through a one-method `putObject` client, which the AWS SDK v3 `S3` client already provides. By default each entry is its own JSON object keyed `<keyPrefix>YYYY/MM/DD/<timestamp>-<uuid>.json`. With `batch`, entries are buffered and uploaded together as one newline-delimited JSON object when `batchSize` is reached or `maxWaitMs` passes; `flush()` uploads what is buffered, and entries from a failed upload are kept and retried.

@@ -74,3 +74,13 @@ export type {
   S3ErrorOptions,
   S3PutObjectInput,
 } from './adapters/s3-error-adapter.js';
+export {
+  FirestoreErrorAdapter,
+  RealtimeDatabaseErrorAdapter,
+} from './adapters/firebase-error-adapter.js';
+export type {
+  FirebaseErrorOptions,
+  FirebaseErrorRecord,
+  FirestoreCollectionLike,
+  RealtimeDatabaseRefLike,
+} from './adapters/firebase-error-adapter.js';
