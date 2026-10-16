@@ -9,7 +9,9 @@
 
 ## Overview
 
-A small, dependency-free TypeScript library for routing runtime errors to the sink of your choice. Code against a single ErrorLogAdapter interface, then swap between console, webhook, MongoDB, or your own custom adapter without changing application code. Adapters never throw: a failing sink is caught and reported through the returned result, so error logging can’t take down your app. Extracted from [chat-and-react](https://github.com/RichardMcQuiston01/chat-and-react).
+A small, dependency-free TypeScript library for routing runtime errors to the sink of your choice. Code against a single `ErrorLogAdapter` interface, then swap between console, webhook, files, databases, queues, object storage, browser storage, or your own custom adapter without changing application code. Adapters never throw: a failing sink is caught and reported through the returned result, so error logging can't take down your app. Extracted from [chat-and-react](https://github.com/RichardMcQuiston01/chat-and-react).
+
+The package imports no database or cloud SDKs. Each adapter takes a tiny structural interface (such as `{ query(sql, params) }`), which the usual client (`pg`, `mysql2`, `node-redis`, the AWS SDK, `firebase-admin`, `supabase-js`, a MongoDB `Collection`) already satisfies, so you bring your own client and version.
 
 [Back to Top](#table-of-contents)
 
@@ -17,7 +19,7 @@ A small, dependency-free TypeScript library for routing runtime errors to the si
 
 ### Prerequisites
 
-- Node.js 18 or later (uses the built-in `fetch`), or any runtime with a global `fetch`
+- Node.js 18 or later, Bun, or a browser. Adapters that need `fetch`, `crypto` or the file system use the runtime's built-ins.
 - TypeScript 5 or later (optional)
 
 ### Installation
@@ -54,15 +56,6 @@ if (!result.ok) {
 }
 ```
 
-Available adapters:
-
-| Adapter                 | Sink                                                                               |
-| ----------------------- | ---------------------------------------------------------------------------------- |
-| `ConsoleErrorAdapter`   | `console.error`                                                                    |
-| `WebhookErrorAdapter`   | HTTP `POST` of the entry as JSON                                                   |
-| `MongoDbErrorAdapter`   | Any object with `insertOne`, such as a MongoDB `Collection` (no driver dependency) |
-| `CompositeErrorAdapter` | Several adapters at once; succeeds only if all succeed                             |
-
 `ErrorLogEntry` is generic over the error code, so each project can restrict codes to its own union:
 
 ```ts
@@ -71,25 +64,149 @@ const errorLog: ErrorLogAdapter<AppErrorCode> =
   new ConsoleErrorAdapter<AppErrorCode>();
 ```
 
+Constructor options are checked when the adapter is created and throw a descriptive `RangeError` for a bad value (an invalid table name, a non-positive limit). `log()` itself never throws.
+
+### Adapters
+
+Every adapter takes an optional `prefix` (default `[error-log-adapter]`) that is printed before its failure messages.
+
+| Adapter                             | Sink                                                      | Runs in       | Main options                                     |
+| ----------------------------------- | --------------------------------------------------------- | ------------- | ------------------------------------------------ |
+| `ConsoleErrorAdapter`               | `console.error`                                           | Anywhere      |                                                  |
+| `WebhookErrorAdapter(url)`          | HTTP `POST` of the entry as JSON                          | Anywhere      | `headers`, `timeoutMs`, `allowInsecure`          |
+| `MongoDbErrorAdapter(collection)`   | Anything with `insertOne`, such as a MongoDB `Collection` | Node          | `timeoutMs`                                      |
+| `PostgresErrorAdapter(client)`      | A Postgres table, through `pg`                            | Node          | `tableName`, `createTable`, `timeoutMs`          |
+| `MySqlErrorAdapter(client)`         | A MySQL / MariaDB table, through `mysql2/promise`         | Node          | `tableName`, `createTable`, `timeoutMs`          |
+| `SqliteErrorAdapter(client)`        | A SQLite table, through any driver                        | Node, Bun     | `tableName`, `createTable`, `timeoutMs`          |
+| `SupabaseErrorAdapter(client)`      | A Supabase table, through `supabase-js`                   | Anywhere      | `tableName`, `timeoutMs`                         |
+| `RedisErrorAdapter(client)`         | A Redis list or stream                                    | Node          | `mode`, `key`, `maxEntries`, `side`, `timeoutMs` |
+| `S3ErrorAdapter(client, bucket)`    | S3, DigitalOcean Spaces, R2, MinIO objects                | Node          | `keyPrefix`, `batch`, `contentType`, `timeoutMs` |
+| `FirestoreErrorAdapter(collection)` | A Firestore collection                                    | Node, browser | `timeoutMs`                                      |
+| `RealtimeDatabaseErrorAdapter(ref)` | A Realtime Database reference                             | Node, browser | `timeoutMs`                                      |
+| `FlatFileErrorAdapter(path)`        | One text line per entry                                   | Node, Bun     | `formatLine`, `maxBytes`, `maxFiles`             |
+| `JsonFileErrorAdapter(path)`        | NDJSON lines or one JSON array                            | Node, Bun     | `mode`, `maxEntries`, `indent`                   |
+| `IndexedDbErrorAdapter(database)`   | An IndexedDB object store                                 | Browser       | `storeName`, `timeoutMs`                         |
+| `WebStorageErrorAdapter(storage)`   | `sessionStorage` or `localStorage`, as one capped array   | Browser       | `key`, `maxEntries`, `locks`                     |
+| `CompositeErrorAdapter([...])`      | Several adapters at once; succeeds only if all succeed    | Anywhere      | `timeoutMs`                                      |
+
+Every stored record has the same shape: a UUID `id`, `code`, `message`, `timestamp` (ISO 8601), and optional `source` and `cause`. An `Error` cause is stored as `{ name, message, stack }`. `serializeEntry` and `serializeCause` are exported if you build your own sink.
+
+What changes durability or size, by adapter:
+
+- **SQL adapters** (`createTable`): the table is created on first use by default. Set `createTable: false` and run the statements from `buildErrorLogTableDdl('postgres' | 'mysql')` (or `buildCreateErrorLogTableSql()` for SQLite) yourself if the application's database user should not change the schema. Table names are checked to be plain identifiers. A MySQL table made by 0.4.0 or earlier has `VARCHAR(255)` columns for `code` and `source`; run the statement from `buildMySqlWidenColumnsSql()` once to widen them.
+- **Supabase**: create the table once with `buildSupabaseSetupSql()`, which also turns on row level security. Log from a server with the service role key, which bypasses RLS and must never reach a browser. A browser-held key needs an insert policy: pass `insertRoles: ['authenticated']` to the same function. The policy limits the size of each field but cannot tie a row to a user, so a holder of that key can still add entries of their own. Listing `anon` or `public` throws unless you also pass `allowPublicInsert: true`, because the anon key is public.
+- **S3** (`batch`): with `batch: { batchSize, maxWaitMs }`, entries are buffered and uploaded together as one NDJSON object. `log()` then returns `ok` as soon as the entry is buffered, so call `flush()` before the process exits.
+- **Files** (`maxBytes` / `maxFiles`, `maxEntries`): the flat file adapter rotates by size; the JSON file adapter's `array` mode keeps the newest `maxEntries`.
+- **Redis and Web Storage** (`maxEntries`): the oldest entries are dropped past the cap.
+- **Browser storage**: `sessionStorage` belongs to one tab. `localStorage` is shared by every tab and has no atomic update, so two tabs logging at the same instant can overwrite each other's entry. `WebStorageErrorAdapter` takes a `navigator.locks` lock around each write, which reduces the loss but cannot remove it, since tabs in separate processes can still read a stale copy. Use `IndexedDbErrorAdapter` when every entry matters. Create its object store from your `onupgradeneeded` handler with `createErrorLogStore`. A stored value the adapter cannot read is copied to `<key>.corrupt` before it is replaced.
+- **Webhook**: the URL must be `https://` (or `http://localhost`, `127.0.0.1`, `[::1]`) unless you pass `allowInsecure: true`, because entries carry messages and stack traces. Redirects are not followed, since a redirect would turn the `POST` into a body-less `GET` or re-send the entry and your headers to another host; a redirect is reported as `ok: false`. Failure messages contain only the origin, never the path or query, because webhook URLs often hold a secret.
+
+### When a sink is slow or down
+
+`log()` never rejects, and it does not wait forever either. Every adapter that talks over a network or to a driver takes `timeoutMs` (default `10000`; `Infinity` waits without limit). When it passes, `log()` returns `{ ok: false }` with a message such as `Postgres did not respond within 10000 ms, so the entry may or may not have been stored`. Drivers cannot cancel a call, so the write may still finish afterwards (the webhook is the exception: its request is aborted). `CompositeErrorAdapter` has its own per-adapter `timeoutMs` (default `30000`), so one hung custom adapter cannot hold back the others.
+
+Because of that, a failed call is not proof that nothing was stored. To retry safely, give the entry an `id`:
+
+```ts
+const entry = {
+  id: crypto.randomUUID(), // a UUID; anything else makes log() return ok: false
+  timestamp: new Date().toISOString(),
+  code: 'PAYMENT_FAILED',
+  message: 'Card was declined by the processor',
+};
+
+let result = await errorLog.log(entry);
+if (!result.ok) {
+  result = await errorLog.log(entry); // same id: a repeat is stored once
+}
+```
+
+Without an `id`, every call to `log()` gets a new random one, so logging twice stores two records. With one:
+
+| Adapter                                              | A repeat of the same `id`                                                                                       |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Postgres, MySQL, SQLite                              | Stored once (`ON CONFLICT` / `ON DUPLICATE KEY`)                                                                |
+| MongoDB, Supabase                                    | Stored once; the duplicate-key error counts as success                                                          |
+| Firestore                                            | Overwrites the same document                                                                                    |
+| Realtime Database                                    | Overwrites the same key. Needs `child(key).set(value)` on the reference you pass in; without it `log()` says so |
+| IndexedDB, Web Storage, JSON file (`array` mode)     | Replaces the earlier record                                                                                     |
+| S3                                                   | Overwrites the same object only if the retry also has the same `timestamp` (the key contains both)              |
+| Webhook                                              | The `id` is added to the JSON body so the receiver can drop repeats                                             |
+| Redis, flat file, JSON file (`ndjson` mode), console | Cannot detect a repeat                                                                                          |
+
+`CompositeErrorAdapter` passes the entry through unchanged, so every sink sees the same `id`.
+
+### What gets stored for a `cause`
+
+`serializeCause` turns any cause into something `JSON.stringify` always accepts, so an unusual cause can never stop an entry from being stored. An `Error` becomes `{ name, message, stack }` plus its own `cause` and, for an `AggregateError`, `errors`, recursively. Circular references become `"[Circular]"`, nesting deeper than 6 levels becomes `"[Truncated]"`, and `BigInt`, `Symbol`, functions and non-finite numbers become strings.
+
 ### Examples
 
-Send errors to a webhook and a database, and keep a console copy:
+Write to files, a database and the console at once:
+
+```ts
+import { Pool } from 'pg';
+import {
+  CompositeErrorAdapter,
+  ConsoleErrorAdapter,
+  FlatFileErrorAdapter,
+  PostgresErrorAdapter,
+} from '@richardmcquiston01/error-log-adapter';
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+const errorLog = new CompositeErrorAdapter([
+  new ConsoleErrorAdapter(),
+  new FlatFileErrorAdapter('logs/errors.log', { maxBytes: 5_000_000 }),
+  new PostgresErrorAdapter(pool, { createTable: false }),
+]);
+```
+
+Send errors to a webhook and MongoDB:
 
 ```ts
 import {
   CompositeErrorAdapter,
-  ConsoleErrorAdapter,
   MongoDbErrorAdapter,
   WebhookErrorAdapter,
 } from '@richardmcquiston01/error-log-adapter';
 
 const errorLog = new CompositeErrorAdapter([
-  new ConsoleErrorAdapter(),
   new WebhookErrorAdapter('https://example.com/errors', {
     headers: { 'X-Api-Key': process.env.ERROR_WEBHOOK_KEY ?? '' },
   }),
   new MongoDbErrorAdapter(db.collection('error_log')),
 ]);
+```
+
+Keep the last 200 errors in the browser:
+
+```ts
+import { WebStorageErrorAdapter } from '@richardmcquiston01/error-log-adapter';
+
+const errorLog = new WebStorageErrorAdapter(window.localStorage, {
+  maxEntries: 200,
+});
+```
+
+Upload to a DigitalOcean Space in batches:
+
+```ts
+import { S3Client } from '@aws-sdk/client-s3';
+import { S3ErrorAdapter } from '@richardmcquiston01/error-log-adapter';
+
+const s3 = new S3Client({
+  region: 'nyc3',
+  endpoint: 'https://nyc3.digitaloceanspaces.com',
+  credentials: { accessKeyId, secretAccessKey },
+});
+
+const errorLog = new S3ErrorAdapter(s3, 'my-space', {
+  keyPrefix: 'logs/app/',
+  batch: { batchSize: 50, maxWaitMs: 30_000 },
+});
+
+process.on('beforeExit', () => void errorLog.flush());
 ```
 
 Write your own adapter by implementing the interface. Catch failures and return them rather than throwing:
@@ -119,6 +236,8 @@ class SlackErrorAdapter implements ErrorLogAdapter {
   }
 }
 ```
+
+See [ROADMAP.md](./ROADMAP.md) for planned adapters and [CHANGELOG.md](./CHANGELOG.md) for what changed in each release.
 
 ### Development
 

@@ -1,3 +1,5 @@
+import { SerialQueue } from '../queue.js';
+import { DEFAULT_PREFIX, reportFailure } from '../fail.js';
 import {
   isMissingFileError,
   loadNodeFileSystem,
@@ -88,7 +90,7 @@ export class FlatFileErrorAdapter<
   private readonly prefix: string;
   private fs: FileSystemLike | undefined;
   private directoryReady: boolean = false;
-  private queue: Promise<unknown> = Promise.resolve();
+  private readonly queue: SerialQueue = new SerialQueue();
 
   /** @throws {RangeError} if `maxBytes` or `maxFiles` is not a positive integer. */
   constructor(
@@ -100,7 +102,7 @@ export class FlatFileErrorAdapter<
     this.maxBytes = options.maxBytes;
     this.maxFiles = options.maxFiles ?? DEFAULT_MAX_FILES;
     this.createDirectory = options.createDirectory ?? true;
-    this.prefix = options.prefix ?? '[error-log-adapter]';
+    this.prefix = options.prefix ?? DEFAULT_PREFIX;
     if (this.maxBytes !== undefined) {
       assertPositiveInteger(this.maxBytes, 'maxBytes');
     }
@@ -108,12 +110,7 @@ export class FlatFileErrorAdapter<
   }
 
   log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
-    const result: Promise<ErrorLogResult> = this.queue.then(() =>
-      this.write(entry)
-    );
-    // write() never rejects, but keep the queue alive no matter what.
-    this.queue = result.catch(() => undefined);
-    return result;
+    return this.queue.run((): Promise<ErrorLogResult> => this.write(entry));
   }
 
   private async write(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
@@ -128,11 +125,12 @@ export class FlatFileErrorAdapter<
       await fs.appendFile(this.filePath, line);
       return { ok: true };
     } catch (error: unknown) {
-      console.error(`${this.prefix} FlatFileErrorAdapter:`, error);
-      return {
-        ok: false,
-        error: `FlatFileErrorAdapter failed to append to "${this.filePath}": ${describeError(error)}`,
-      };
+      return reportFailure({
+        adapterName: 'FlatFileErrorAdapter',
+        prefix: this.prefix,
+        action: `to append to "${this.filePath}"`,
+        error,
+      });
     }
   }
 

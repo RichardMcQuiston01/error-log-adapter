@@ -1,4 +1,11 @@
-import { describeError, serializeEntry } from '../serialize.js';
+import { DEFAULT_PREFIX, reportFailure } from '../fail.js';
+import { hasCallerId, resolveEntryId } from '../entry-id.js';
+import {
+  DEFAULT_TIMEOUT_MS,
+  resolveTimeoutMs,
+  withTimeout,
+} from '../timeout.js';
+import { serializeEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
   ErrorLogEntry,
@@ -45,15 +52,23 @@ export interface FirestoreCollectionLike {
  * ```ts
  * const refLike: RealtimeDatabaseRefLike = {
  *   push: (value) => push(ref(db, 'error_log'), value),
+ *   child: (key) => ({ set: (value) => set(ref(db, `error_log/${key}`), value) }),
  * };
  * ```
+ *
+ * `child(key).set(value)` is only needed for entries that carry their own `id`
+ * (see `ErrorLogEntry.id`): they are written under that key, so logging the same
+ * entry again overwrites the record instead of adding a second one.
  */
 export interface RealtimeDatabaseRefLike {
   push(value: FirebaseErrorRecord): PromiseLike<unknown>;
+  child?(key: string): {
+    set(value: FirebaseErrorRecord): PromiseLike<unknown>;
+  };
 }
 
 /** Default time to wait for a write to be saved, in milliseconds. */
-export const DEFAULT_WRITE_TIMEOUT_MS = 10_000;
+export const DEFAULT_WRITE_TIMEOUT_MS: number = DEFAULT_TIMEOUT_MS;
 
 export interface FirebaseErrorOptions {
   /**
@@ -63,54 +78,24 @@ export interface FirebaseErrorOptions {
    * The Firebase SDKs keep writes queued while the connection is down, and
    * their promises stay pending until it returns, so without a limit `log`
    * could hang for as long as an outage lasts. A write that timed out is still
-   * queued by the SDK and may be saved later.
+   * queued by the SDK and may be saved later. Retry a timeout only with the same
+   * `ErrorLogEntry.id`, so the retry overwrites the first write instead of
+   * adding a second one.
    */
   timeoutMs?: number;
   /** Text printed before failure messages. Defaults to `[error-log-adapter]`. */
   prefix?: string;
 }
 
-function resolveTimeout(
-  options: FirebaseErrorOptions,
-  adapter: string
-): number {
-  const timeoutMs: number = options.timeoutMs ?? DEFAULT_WRITE_TIMEOUT_MS;
-  if (Number.isNaN(timeoutMs) || timeoutMs <= 0) {
-    throw new RangeError(
-      `${adapter}: timeoutMs must be a positive number or Infinity, received ${String(options.timeoutMs)}.`
-    );
-  }
-  return timeoutMs;
-}
-
 /** Waits for the write, but rejects with a descriptive error if it takes longer than `timeoutMs`. */
 function waitForWrite(
-  write: PromiseLike<unknown>,
+  start: () => PromiseLike<unknown>,
   timeoutMs: number
 ): Promise<unknown> {
-  if (timeoutMs === Infinity) {
-    return Promise.resolve(write);
-  }
-  return new Promise<unknown>(
-    (resolve: (value: unknown) => void, reject: (reason: unknown) => void) => {
-      const timer = setTimeout((): void => {
-        reject(
-          new Error(
-            `the write was not saved within ${timeoutMs} ms (the connection may be down; the SDK keeps the write queued and may still save it later)`
-          )
-        );
-      }, timeoutMs);
-      write.then(
-        (value: unknown): void => {
-          clearTimeout(timer);
-          resolve(value);
-        },
-        (reason: unknown): void => {
-          clearTimeout(timer);
-          reject(reason);
-        }
-      );
-    }
+  return withTimeout(
+    start,
+    timeoutMs,
+    `the write was not saved within ${timeoutMs} ms (the connection may be down; the SDK keeps the write queued and may still save it later, so logging the entry again could store it twice unless it carries an id)`
   );
 }
 
@@ -119,7 +104,7 @@ function buildRecord<TCode extends string>(
 ): FirebaseErrorRecord {
   const serialized = serializeEntry(entry);
   const record: FirebaseErrorRecord = {
-    id: crypto.randomUUID(),
+    id: resolveEntryId(entry),
     code: serialized.code,
     message: serialized.message,
     timestamp: serialized.timestamp,
@@ -135,7 +120,11 @@ function buildRecord<TCode extends string>(
 
 /**
  * Writes each entry as a document in a Firestore collection. The document id is
- * the entry's UUID, so retrying a write never creates a duplicate.
+ * the entry's UUID, so the SDK finishing one queued write twice cannot create two
+ * documents. Calling `log` again without an `id` on the entry is a new write
+ * with a new UUID: if a call reported a timeout, the first write may still be
+ * saved later, and logging the same entry again can store it twice. Give the
+ * entry an `id` and the retry overwrites the same document.
  */
 export class FirestoreErrorAdapter<
   TCode extends string = string,
@@ -148,24 +137,28 @@ export class FirestoreErrorAdapter<
     private readonly collection: FirestoreCollectionLike,
     options: FirebaseErrorOptions = {}
   ) {
-    this.prefix = options.prefix ?? '[error-log-adapter]';
-    this.timeoutMs = resolveTimeout(options, 'FirestoreErrorAdapter');
+    this.prefix = options.prefix ?? DEFAULT_PREFIX;
+    this.timeoutMs = resolveTimeoutMs(
+      options.timeoutMs,
+      'FirestoreErrorAdapter'
+    );
   }
 
   async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
     try {
       const record: FirebaseErrorRecord = buildRecord(entry);
       await waitForWrite(
-        this.collection.doc(record.id).set(record),
+        () => this.collection.doc(record.id).set(record),
         this.timeoutMs
       );
       return { ok: true };
     } catch (error: unknown) {
-      console.error(`${this.prefix} FirestoreErrorAdapter:`, error);
-      return {
-        ok: false,
-        error: `FirestoreErrorAdapter failed to write the document: ${describeError(error)}`,
-      };
+      return reportFailure({
+        adapterName: 'FirestoreErrorAdapter',
+        prefix: this.prefix,
+        action: `to write the document`,
+        error,
+      });
     }
   }
 }
@@ -185,23 +178,36 @@ export class RealtimeDatabaseErrorAdapter<
     private readonly reference: RealtimeDatabaseRefLike,
     options: FirebaseErrorOptions = {}
   ) {
-    this.prefix = options.prefix ?? '[error-log-adapter]';
-    this.timeoutMs = resolveTimeout(options, 'RealtimeDatabaseErrorAdapter');
+    this.prefix = options.prefix ?? DEFAULT_PREFIX;
+    this.timeoutMs = resolveTimeoutMs(
+      options.timeoutMs,
+      'RealtimeDatabaseErrorAdapter'
+    );
   }
 
   async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
     try {
-      await waitForWrite(
-        this.reference.push(buildRecord(entry)),
-        this.timeoutMs
-      );
+      const record: FirebaseErrorRecord = buildRecord(entry);
+      let write: PromiseLike<unknown>;
+      if (hasCallerId(entry)) {
+        if (this.reference.child === undefined) {
+          throw new TypeError(
+            'the entry has an id, which needs a reference with child(key).set(value) so a repeat overwrites the first write; add child to the reference or log without an id'
+          );
+        }
+        write = this.reference.child(record.id).set(record);
+      } else {
+        write = this.reference.push(record);
+      }
+      await waitForWrite(() => write, this.timeoutMs);
       return { ok: true };
     } catch (error: unknown) {
-      console.error(`${this.prefix} RealtimeDatabaseErrorAdapter:`, error);
-      return {
-        ok: false,
-        error: `RealtimeDatabaseErrorAdapter failed to write the entry: ${describeError(error)}`,
-      };
+      return reportFailure({
+        adapterName: 'RealtimeDatabaseErrorAdapter',
+        prefix: this.prefix,
+        action: `to write the entry`,
+        error,
+      });
     }
   }
 }

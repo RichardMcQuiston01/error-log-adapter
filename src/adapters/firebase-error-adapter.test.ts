@@ -154,29 +154,36 @@ describe.each([
     spy.mockRestore();
   });
 
-  it('returns a failure result, without writing, if the cause cannot be serialized', async () => {
+  it('stores an entry whose cause is circular, marking the loop', async () => {
     const { adapter, written } = setup();
     const circular: Record<string, unknown> = {};
     circular['self'] = circular;
-    const spy = silenceConsole();
 
     const result = await adapter().log({ ...ENTRY, cause: circular });
 
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain('circular');
-    expect(written()).toHaveLength(0);
-    spy.mockRestore();
+    expect(result).toEqual({ ok: true });
+    expect(written()[0].cause).toContain('[Circular]');
   });
 });
 
 describe('FirestoreErrorAdapter document ids', () => {
-  it('uses the record id as the document id, so a retried write cannot duplicate', async () => {
+  it('uses the record id as the document id', async () => {
     const { collection, doc, set } = fakeFirestore();
 
     await new FirestoreErrorAdapter(collection).log(ENTRY);
 
     expect(doc).toHaveBeenCalledTimes(1);
     expect(doc.mock.calls[0]?.[0]).toBe(set.mock.calls[0]?.[0].id);
+  });
+
+  it('gives a second log call for the same entry a new id, so a caller retry is a new document', async () => {
+    const { collection, set } = fakeFirestore();
+    const adapter = new FirestoreErrorAdapter(collection);
+
+    await adapter.log(ENTRY);
+    await adapter.log(ENTRY);
+
+    expect(set.mock.calls[0]?.[0].id).not.toBe(set.mock.calls[1]?.[0].id);
   });
 });
 
@@ -240,6 +247,7 @@ describe.each([
     expect(result.ok).toBe(false);
     expect(result.error).toContain(name);
     expect(result.error).toContain('not saved within 5000 ms');
+    expect(result.error).toContain('could store it twice');
     spy.mockRestore();
   });
 

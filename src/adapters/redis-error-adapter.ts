@@ -1,3 +1,6 @@
+import { DEFAULT_PREFIX, reportFailure } from '../fail.js';
+import { resolveEntryId } from '../entry-id.js';
+import { resolveTimeoutMs, timeoutMessage, withTimeout } from '../timeout.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
@@ -43,6 +46,12 @@ export interface RedisErrorOptions {
   side?: 'left' | 'right';
   /** Text printed before failure messages. Defaults to `[error-log-adapter]`. */
   prefix?: string;
+  /**
+   * How long `log` waits for each Redis command before giving up, in milliseconds. Defaults
+   * to 10000. Pass `Infinity` to wait without limit. The call cannot be
+   * cancelled, so it may still finish after `log` has returned a failure.
+   */
+  timeoutMs?: number;
 }
 
 /**
@@ -58,6 +67,7 @@ export class RedisErrorAdapter<
   private readonly maxEntries: number | undefined;
   private readonly side: 'left' | 'right';
   private readonly prefix: string;
+  private readonly timeoutMs: number;
 
   /** @throws {RangeError} if `key` is empty, `maxEntries` is not a positive integer, or `mode` / `side` is unknown. */
   constructor(
@@ -68,7 +78,8 @@ export class RedisErrorAdapter<
     this.key = options.key ?? DEFAULT_REDIS_KEY;
     this.maxEntries = options.maxEntries;
     this.side = options.side ?? 'right';
-    this.prefix = options.prefix ?? '[error-log-adapter]';
+    this.prefix = options.prefix ?? DEFAULT_PREFIX;
+    this.timeoutMs = resolveTimeoutMs(options.timeoutMs, 'RedisErrorAdapter');
     if (this.mode !== 'list' && this.mode !== 'stream') {
       throw new RangeError(
         `RedisErrorAdapter: mode must be "list" or "stream", received "${String(options.mode)}".`
@@ -94,11 +105,11 @@ export class RedisErrorAdapter<
 
   async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
     try {
-      const record = { id: crypto.randomUUID(), ...serializeEntry(entry) };
+      const record = { id: resolveEntryId(entry), ...serializeEntry(entry) };
       if (this.mode === 'stream') {
-        await this.client.sendCommand(this.buildStreamCommand(record));
+        await this.send(this.buildStreamCommand(record));
       } else {
-        await this.client.sendCommand([
+        await this.send([
           this.side === 'left' ? 'LPUSH' : 'RPUSH',
           this.key,
           JSON.stringify(record),
@@ -107,11 +118,12 @@ export class RedisErrorAdapter<
       }
       return { ok: true };
     } catch (error: unknown) {
-      console.error(`${this.prefix} RedisErrorAdapter:`, error);
-      return {
-        ok: false,
-        error: `RedisErrorAdapter failed to write to ${this.mode} "${this.key}": ${describeError(error)}`,
-      };
+      return reportFailure({
+        adapterName: 'RedisErrorAdapter',
+        prefix: this.prefix,
+        action: `to write to ${this.mode} "${this.key}"`,
+        error,
+      });
     }
   }
 
@@ -152,6 +164,15 @@ export class RedisErrorAdapter<
    * stored by now, so a trim failure is reported but does not fail the call;
    * the next successful write trims the list again.
    */
+  /** Sends one command, giving up waiting after `timeoutMs`. */
+  private send(args: string[]): Promise<unknown> {
+    return withTimeout(
+      (): Promise<unknown> => this.client.sendCommand(args),
+      this.timeoutMs,
+      timeoutMessage('Redis', this.timeoutMs)
+    );
+  }
+
   private async trimList(): Promise<void> {
     if (this.maxEntries === undefined) {
       return;
@@ -160,7 +181,7 @@ export class RedisErrorAdapter<
     const [start, stop]: [string, string] =
       this.side === 'right' ? [String(-keep), '-1'] : ['0', String(keep - 1)];
     try {
-      await this.client.sendCommand(['LTRIM', this.key, start, stop]);
+      await this.send(['LTRIM', this.key, start, stop]);
     } catch (error: unknown) {
       console.error(
         `${this.prefix} RedisErrorAdapter: stored the entry but could not trim list "${this.key}" to ${keep} entries: ${describeError(error)}`

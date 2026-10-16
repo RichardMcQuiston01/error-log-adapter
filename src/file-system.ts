@@ -23,7 +23,15 @@ export async function loadNodeFileSystem(): Promise<ReadWriteFileSystemLike> {
   return (await import(moduleName)) as ReadWriteFileSystemLike;
 }
 
-/** Returns the folder part of a path, or `null` if the path has none. */
+/** A filesystem root: `/`, `\\`, `C:\\` or `C:/`, which always exists and cannot be created. */
+const ROOT_PATTERN: RegExp = /^(?:[A-Za-z]:)?[\\/]+$/;
+
+/**
+ * Returns the folder to create for a file path, or `null` when there is nothing
+ * to create: the path has no folder part (`app.log`), or its folder is a
+ * filesystem root that always exists (`/app.log`, `C:\\app.log`, `\\app.log`).
+ * Calling `mkdir` on a Windows drive root fails with `EPERM`.
+ */
 export function parentDirectory(filePath: string): string | null {
   const lastSeparator: number = Math.max(
     filePath.lastIndexOf('/'),
@@ -32,7 +40,11 @@ export function parentDirectory(filePath: string): string | null {
   if (lastSeparator < 0) {
     return null;
   }
-  return lastSeparator === 0 ? '/' : filePath.slice(0, lastSeparator);
+  const directory: string = filePath.slice(0, lastSeparator + 1);
+  if (ROOT_PATTERN.test(directory)) {
+    return null;
+  }
+  return filePath.slice(0, lastSeparator);
 }
 
 /** True for the error Node throws when a file or folder does not exist. */

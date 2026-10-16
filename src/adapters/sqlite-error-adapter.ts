@@ -1,14 +1,13 @@
-import { describeError, serializeEntry } from '../serialize.js';
+import { DEFAULT_PREFIX, reportFailure } from '../fail.js';
+import { DEFAULT_TABLE_NAME, assertIdentifier } from '../sql-ident.js';
+import { resolveEntryId } from '../entry-id.js';
+import { resolveTimeoutMs, timeoutMessage, withTimeout } from '../timeout.js';
+import { serializeEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
   ErrorLogEntry,
   ErrorLogResult,
 } from '../types.js';
-
-/** Default table name. */
-export const DEFAULT_TABLE_NAME = 'error_log';
-
-const IDENTIFIER_PATTERN: RegExp = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /**
  * The only thing this adapter needs from a SQLite driver: run one statement
@@ -33,15 +32,17 @@ export interface SqliteErrorOptions {
   createTable?: boolean;
   /** Text printed before failure messages. Defaults to `[error-log-adapter]`. */
   prefix?: string;
+  /**
+   * How long `log` waits for the driver before giving up, in milliseconds. Defaults
+   * to 10000. Pass `Infinity` to wait without limit. The call cannot be
+   * cancelled, so it may still finish after `log` has returned a failure.
+   */
+  timeoutMs?: number;
 }
 
 /** Throws a descriptive error unless `tableName` is a plain SQL identifier. */
 function assertValidTableName(tableName: string): void {
-  if (!IDENTIFIER_PATTERN.test(tableName)) {
-    throw new RangeError(
-      `SqliteErrorAdapter: invalid table name "${tableName}". Use only letters, digits and underscores, and do not start with a digit.`
-    );
-  }
+  assertIdentifier(tableName, 'table name', 'SqliteErrorAdapter');
 }
 
 /**
@@ -72,9 +73,10 @@ export class SqliteErrorAdapter<
   private readonly tableName: string;
   private readonly createTable: boolean;
   private readonly prefix: string;
+  private readonly timeoutMs: number;
   private tableReady: Promise<void> | null = null;
 
-  /** @throws {RangeError} if `options.tableName` is not a plain identifier. */
+  /** @throws {RangeError} if `options.tableName` is not a plain identifier or `options.timeoutMs` is invalid. */
   constructor(
     private readonly client: SqliteClientLike,
     options: SqliteErrorOptions = {}
@@ -82,17 +84,18 @@ export class SqliteErrorAdapter<
     this.tableName = options.tableName ?? DEFAULT_TABLE_NAME;
     assertValidTableName(this.tableName);
     this.createTable = options.createTable ?? true;
-    this.prefix = options.prefix ?? '[error-log-adapter]';
+    this.prefix = options.prefix ?? DEFAULT_PREFIX;
+    this.timeoutMs = resolveTimeoutMs(options.timeoutMs, 'SqliteErrorAdapter');
   }
 
   async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
     try {
       await this.ensureTable();
       const serialized = serializeEntry(entry);
-      await this.client.run(
-        `INSERT INTO ${this.tableName} (id, code, message, cause, source, occurred_at) VALUES (?, ?, ?, ?, ?, ?)`,
+      await this.run(
+        `INSERT INTO ${this.tableName} (id, code, message, cause, source, occurred_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO NOTHING`,
         [
-          crypto.randomUUID(),
+          resolveEntryId(entry),
           serialized.code,
           serialized.message,
           serialized.cause === undefined
@@ -104,11 +107,12 @@ export class SqliteErrorAdapter<
       );
       return { ok: true };
     } catch (error: unknown) {
-      console.error(`${this.prefix} SqliteErrorAdapter:`, error);
-      return {
-        ok: false,
-        error: `SqliteErrorAdapter failed to write to table "${this.tableName}": ${describeError(error)}`,
-      };
+      return reportFailure({
+        adapterName: 'SqliteErrorAdapter',
+        prefix: this.prefix,
+        action: `to write to table "${this.tableName}"`,
+        error,
+      });
     }
   }
 
@@ -130,7 +134,16 @@ export class SqliteErrorAdapter<
 
   private async runCreateStatements(): Promise<void> {
     for (const sql of buildCreateErrorLogTableSql(this.tableName)) {
-      await this.client.run(sql, []);
+      await this.run(sql, []);
     }
+  }
+
+  /** Runs one statement, giving up waiting after `timeoutMs`. */
+  private run(sql: string, params: unknown[]): Promise<unknown> {
+    return withTimeout(
+      (): unknown => this.client.run(sql, params),
+      this.timeoutMs,
+      timeoutMessage('SQLite', this.timeoutMs)
+    );
   }
 }

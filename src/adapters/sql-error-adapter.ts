@@ -1,20 +1,19 @@
-import { describeError, serializeEntry } from '../serialize.js';
+import { DEFAULT_PREFIX, reportFailure } from '../fail.js';
+import { DEFAULT_TABLE_NAME, assertIdentifier } from '../sql-ident.js';
+import { resolveEntryId } from '../entry-id.js';
+import { resolveTimeoutMs, timeoutMessage, withTimeout } from '../timeout.js';
+import { serializeEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
   ErrorLogEntry,
   ErrorLogResult,
 } from '../types.js';
 
-/** Default table name. */
-export const DEFAULT_TABLE_NAME = 'error_log';
-
 /**
  * Longest allowed table name. The index name adds `_occurred_at_idx` (16
  * characters) and Postgres limits identifiers to 63.
  */
 export const MAX_TABLE_NAME_LENGTH = 47;
-
-const IDENTIFIER_PATTERN: RegExp = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 export type SqlDialect = 'postgres' | 'mysql';
 
@@ -34,20 +33,17 @@ export interface SqlErrorOptions {
   createTable?: boolean;
   /** Text printed before failure messages. Defaults to `[error-log-adapter]`. */
   prefix?: string;
+  /**
+   * How long `log` waits for each database statement before giving up, in milliseconds. Defaults
+   * to 10000. Pass `Infinity` to wait without limit. The call cannot be
+   * cancelled, so it may still finish after `log` has returned a failure.
+   */
+  timeoutMs?: number;
 }
 
 /** Throws a descriptive error unless `tableName` is a short, plain SQL identifier. */
 function assertValidTableName(tableName: string, adapterName: string): void {
-  if (!IDENTIFIER_PATTERN.test(tableName)) {
-    throw new RangeError(
-      `${adapterName}: invalid table name "${tableName}". Use only letters, digits and underscores, and do not start with a digit.`
-    );
-  }
-  if (tableName.length > MAX_TABLE_NAME_LENGTH) {
-    throw new RangeError(
-      `${adapterName}: table name "${tableName}" is ${tableName.length} characters long, but the limit is ${MAX_TABLE_NAME_LENGTH}.`
-    );
-  }
+  assertIdentifier(tableName, 'table name', adapterName, MAX_TABLE_NAME_LENGTH);
 }
 
 function quoteIdentifier(dialect: SqlDialect, identifier: string): string {
@@ -90,14 +86,28 @@ export function buildErrorLogTableDdl(
   return [
     `CREATE TABLE IF NOT EXISTS ${table} (` +
       'id CHAR(36) NOT NULL PRIMARY KEY, ' +
-      'code VARCHAR(255) NOT NULL, ' +
+      'code TEXT NOT NULL, ' +
       'message TEXT NOT NULL, ' +
       'cause JSON NULL, ' +
-      'source VARCHAR(255) NULL, ' +
+      'source TEXT NULL, ' +
       'occurred_at DATETIME(3) NOT NULL, ' +
       'created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3), ' +
       `INDEX ${index} (occurred_at)` +
       ')',
+  ];
+}
+
+/**
+ * Returns the statement that widens the `code` and `source` columns of a MySQL
+ * table created by `buildErrorLogTableDdl` in 0.4.0 or earlier, where they were
+ * `VARCHAR(255)` and a longer value made the insert fail. Run it once.
+ */
+export function buildMySqlWidenColumnsSql(
+  tableName: string = DEFAULT_TABLE_NAME
+): string[] {
+  assertValidTableName(tableName, 'buildMySqlWidenColumnsSql');
+  return [
+    `ALTER TABLE ${quoteIdentifier('mysql', tableName)} MODIFY code TEXT NOT NULL, MODIFY source TEXT NULL`,
   ];
 }
 
@@ -113,6 +123,7 @@ abstract class SqlErrorAdapter<
   private readonly tableName: string;
   private readonly createTable: boolean;
   private readonly prefix: string;
+  private readonly timeoutMs: number;
   private tableReady: Promise<void> | null = null;
 
   protected constructor(
@@ -124,7 +135,8 @@ abstract class SqlErrorAdapter<
     this.tableName = options.tableName ?? DEFAULT_TABLE_NAME;
     assertValidTableName(this.tableName, adapterName);
     this.createTable = options.createTable ?? true;
-    this.prefix = options.prefix ?? '[error-log-adapter]';
+    this.prefix = options.prefix ?? DEFAULT_PREFIX;
+    this.timeoutMs = resolveTimeoutMs(options.timeoutMs, adapterName);
   }
 
   async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
@@ -137,7 +149,7 @@ abstract class SqlErrorAdapter<
         );
       }
       const params: unknown[] = [
-        crypto.randomUUID(),
+        resolveEntryId(entry),
         serialized.code,
         serialized.message,
         serialized.cause === undefined
@@ -149,14 +161,15 @@ abstract class SqlErrorAdapter<
           : toMysqlDateTime(occurredAt),
       ];
       await this.ensureTable();
-      await this.client.query(this.insertSql(), params);
+      await this.query(this.insertSql(), params);
       return { ok: true };
     } catch (error: unknown) {
-      console.error(`${this.prefix} ${this.adapterName}:`, error);
-      return {
-        ok: false,
-        error: `${this.adapterName} failed to write to table "${this.tableName}": ${describeError(error)}`,
-      };
+      return reportFailure({
+        adapterName: this.adapterName,
+        prefix: this.prefix,
+        action: `to write to table "${this.tableName}"`,
+        error,
+      });
     }
   }
 
@@ -165,7 +178,12 @@ abstract class SqlErrorAdapter<
       this.dialect === 'postgres'
         ? '$1, $2, $3, $4, $5, $6'
         : '?, ?, ?, ?, ?, ?';
-    return `INSERT INTO ${quoteIdentifier(this.dialect, this.tableName)} (id, code, message, cause, source, occurred_at) VALUES (${placeholders})`;
+    // A repeated entry id is a retry: keep the stored row instead of failing on the key.
+    const onRepeat: string =
+      this.dialect === 'postgres'
+        ? 'ON CONFLICT (id) DO NOTHING'
+        : 'ON DUPLICATE KEY UPDATE id = id';
+    return `INSERT INTO ${quoteIdentifier(this.dialect, this.tableName)} (id, code, message, cause, source, occurred_at) VALUES (${placeholders}) ${onRepeat}`;
   }
 
   /** Creates the table once. A failed attempt is retried on the next log call. */
@@ -186,8 +204,20 @@ abstract class SqlErrorAdapter<
 
   private async runCreateStatements(): Promise<void> {
     for (const sql of buildErrorLogTableDdl(this.dialect, this.tableName)) {
-      await this.client.query(sql, []);
+      await this.query(sql, []);
     }
+  }
+
+  /** Runs one statement, giving up waiting after `timeoutMs`. */
+  private query(sql: string, params: unknown[]): Promise<unknown> {
+    return withTimeout(
+      (): Promise<unknown> => this.client.query(sql, params),
+      this.timeoutMs,
+      timeoutMessage(
+        this.dialect === 'postgres' ? 'Postgres' : 'MySQL',
+        this.timeoutMs
+      )
+    );
   }
 }
 

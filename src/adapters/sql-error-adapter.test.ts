@@ -4,6 +4,7 @@ import {
   MySqlErrorAdapter,
   PostgresErrorAdapter,
   buildErrorLogTableDdl,
+  buildMySqlWidenColumnsSql,
 } from './sql-error-adapter.js';
 import type { SqlClientLike } from './sql-error-adapter.js';
 
@@ -36,7 +37,7 @@ describe.each([
     create: (client: SqlClientLike, options?: object) =>
       new PostgresErrorAdapter(client, options),
     insertStart:
-      'INSERT INTO "error_log" (id, code, message, cause, source, occurred_at) VALUES ($1, $2, $3, $4, $5, $6)',
+      'INSERT INTO "error_log" (id, code, message, cause, source, occurred_at) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING',
     occurredAt: '2026-01-02T03:04:05.678Z',
   },
   {
@@ -44,7 +45,7 @@ describe.each([
     create: (client: SqlClientLike, options?: object) =>
       new MySqlErrorAdapter(client, options),
     insertStart:
-      'INSERT INTO `error_log` (id, code, message, cause, source, occurred_at) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO `error_log` (id, code, message, cause, source, occurred_at) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE id = id',
     occurredAt: '2026-01-02 03:04:05.678',
   },
 ])('$name', ({ name, create, insertStart, occurredAt }) => {
@@ -156,18 +157,15 @@ describe.each([
     spy.mockRestore();
   });
 
-  it('fails without touching the database if the cause cannot be serialized', async () => {
+  it('stores an entry whose cause is circular, marking the loop', async () => {
     const { client, query } = fakeClient();
     const circular: Record<string, unknown> = {};
     circular['self'] = circular;
-    const spy = silenceConsole();
 
     const result = await create(client).log({ ...ENTRY, cause: circular });
 
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain('circular');
-    expect(query).not.toHaveBeenCalled();
-    spy.mockRestore();
+    expect(result).toEqual({ ok: true });
+    expect(JSON.stringify(query.mock.calls)).toContain('[Circular]');
   });
 
   it.each(['error log', 'x"; DROP TABLE y; --', '1table', '', 'a'.repeat(48)])(
@@ -211,6 +209,9 @@ describe('buildErrorLogTableDdl', () => {
     expect(statements[0]).toContain('CREATE TABLE IF NOT EXISTS `error_log`');
     expect(statements[0]).toContain('id CHAR(36) NOT NULL PRIMARY KEY');
     expect(statements[0]).toContain('cause JSON NULL');
+    expect(statements[0]).toContain('code TEXT NOT NULL');
+    expect(statements[0]).toContain('source TEXT NULL');
+    expect(statements[0]).not.toContain('VARCHAR');
     expect(statements[0]).toContain(
       'created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)'
     );
@@ -221,6 +222,20 @@ describe('buildErrorLogTableDdl', () => {
 
   it('validates the table name', () => {
     expect(() => buildErrorLogTableDdl('postgres', 'bad name')).toThrowError(
+      /invalid table name/
+    );
+  });
+});
+
+describe('buildMySqlWidenColumnsSql', () => {
+  it('modifies code and source to TEXT', () => {
+    expect(buildMySqlWidenColumnsSql('app_error')).toEqual([
+      'ALTER TABLE `app_error` MODIFY code TEXT NOT NULL, MODIFY source TEXT NULL',
+    ]);
+  });
+
+  it('validates the table name', () => {
+    expect(() => buildMySqlWidenColumnsSql('bad name')).toThrowError(
       /invalid table name/
     );
   });
