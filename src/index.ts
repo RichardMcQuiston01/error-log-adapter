@@ -100,3 +100,9 @@ export type {
   SupabaseInsertResult,
   SupabaseSetupOptions,
 } from './adapters/supabase-error-adapter.js';
+export { EventEmitterErrorAdapter } from './adapters/event-emitter-error-adapter.js';
+export type {
+  EmitterLike,
+  EventEmitterErrorOptions,
+  EventEmitterErrorRecord,
+} from './adapters/event-emitter-error-adapter.js';

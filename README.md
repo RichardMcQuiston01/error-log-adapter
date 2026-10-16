@@ -87,6 +87,7 @@ Every adapter takes an optional `prefix` (default `[error-log-adapter]`) that is
 | `JsonFileErrorAdapter(path)`        | NDJSON lines or one JSON array                            | Node, Bun     | `mode`, `maxEntries`, `indent`                   |
 | `IndexedDbErrorAdapter(database)`   | An IndexedDB object store                                 | Browser       | `storeName`, `timeoutMs`                         |
 | `WebStorageErrorAdapter(storage)`   | `sessionStorage` or `localStorage`, as one capped array   | Browser       | `key`, `maxEntries`, `locks`                     |
+| `EventEmitterErrorAdapter(emitter)` | An event on an emitter you own (in-process hooks)         | Anywhere      | `eventName`, `requireListener`                   |
 | `CompositeErrorAdapter([...])`      | Several adapters at once; succeeds only if all succeed    | Anywhere      | `timeoutMs`                                      |
 
 Every stored record has the same shape: a UUID `id`, `code`, `message`, `timestamp` (ISO 8601), and optional `source` and `cause`. An `Error` cause is stored as `{ name, message, stack }`. `serializeEntry` and `serializeCause` are exported if you build your own sink.
@@ -99,6 +100,7 @@ What changes durability or size, by adapter:
 - **Files** (`maxBytes` / `maxFiles`, `maxEntries`): the flat file adapter rotates by size; the JSON file adapter's `array` mode keeps the newest `maxEntries`.
 - **Redis and Web Storage** (`maxEntries`): the oldest entries are dropped past the cap.
 - **Browser storage**: `sessionStorage` belongs to one tab. `localStorage` is shared by every tab and has no atomic update, so two tabs logging at the same instant can overwrite each other's entry. `WebStorageErrorAdapter` takes a `navigator.locks` lock around each write, which reduces the loss but cannot remove it, since tabs in separate processes can still read a stale copy. Use `IndexedDbErrorAdapter` when every entry matters. Create its object store from your `onupgradeneeded` handler with `createErrorLogStore`. A stored value the adapter cannot read is copied to `<key>.corrupt` before it is replaced.
+- **Event emitter**: each entry is emitted as an `error-log` event whose payload is the stored record, for in-process hooks such as a toast, a metrics counter or a test assertion. Listeners run synchronously, so one that throws makes `log()` return `ok: false` with its message. Node's `EventEmitter` and mitt work as they are; a browser `EventTarget` needs a one-line wrapper (shown in the example below). Don't name the event `error` on a Node `EventEmitter`: it throws when nobody listens. Node's `emit` returns `false` when there are no listeners; pass `requireListener: true` to report that as a failure instead of letting the entry vanish.
 - **Webhook**: the URL must be `https://` (or `http://localhost`, `127.0.0.1`, `[::1]`) unless you pass `allowInsecure: true`, because entries carry messages and stack traces. Redirects are not followed, since a redirect would turn the `POST` into a body-less `GET` or re-send the entry and your headers to another host; a redirect is reported as `ok: false`. Failure messages contain only the origin, never the path or query, because webhook URLs often hold a secret.
 
 ### When a sink is slow or down
@@ -207,6 +209,40 @@ const errorLog = new S3ErrorAdapter(s3, 'my-space', {
 });
 
 process.on('beforeExit', () => void errorLog.flush());
+```
+
+Show a toast, count errors, and keep a file copy, all from one `log` call:
+
+```ts
+import { EventEmitter } from 'node:events';
+import {
+  CompositeErrorAdapter,
+  EventEmitterErrorAdapter,
+  FlatFileErrorAdapter,
+} from '@richardmcquiston01/error-log-adapter';
+
+const bus = new EventEmitter();
+bus.on('error-log', (record) => showToast(record.message));
+bus.on('error-log', (record) => metrics.increment(`errors.${record.code}`));
+
+const errorLog = new CompositeErrorAdapter([
+  new EventEmitterErrorAdapter(bus),
+  new FlatFileErrorAdapter('logs/errors.log'),
+]);
+```
+
+In a browser, wrap an `EventTarget`:
+
+```ts
+const target = new EventTarget();
+const emitter = {
+  emit: (name: string, payload: unknown) =>
+    target.dispatchEvent(new CustomEvent(name, { detail: payload })),
+};
+target.addEventListener('error-log', (event) =>
+  console.log((event as CustomEvent).detail)
+);
+const errorLog = new EventEmitterErrorAdapter(emitter);
 ```
 
 Write your own adapter by implementing the interface. Catch failures and return them rather than throwing:
