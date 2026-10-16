@@ -1,3 +1,4 @@
+import { DEFAULT_PREFIX, reportFailure } from '../fail.js';
 import { resolveEntryId } from '../entry-id.js';
 import { resolveTimeoutMs, timeoutMessage, withTimeout } from '../timeout.js';
 import { describeError, serializeEntry } from '../serialize.js';
@@ -77,7 +78,7 @@ export class RedisErrorAdapter<
     this.key = options.key ?? DEFAULT_REDIS_KEY;
     this.maxEntries = options.maxEntries;
     this.side = options.side ?? 'right';
-    this.prefix = options.prefix ?? '[error-log-adapter]';
+    this.prefix = options.prefix ?? DEFAULT_PREFIX;
     this.timeoutMs = resolveTimeoutMs(options.timeoutMs, 'RedisErrorAdapter');
     if (this.mode !== 'list' && this.mode !== 'stream') {
       throw new RangeError(
@@ -117,11 +118,12 @@ export class RedisErrorAdapter<
       }
       return { ok: true };
     } catch (error: unknown) {
-      console.error(`${this.prefix} RedisErrorAdapter:`, error);
-      return {
-        ok: false,
-        error: `RedisErrorAdapter failed to write to ${this.mode} "${this.key}": ${describeError(error)}`,
-      };
+      return reportFailure({
+        adapterName: 'RedisErrorAdapter',
+        prefix: this.prefix,
+        action: `to write to ${this.mode} "${this.key}"`,
+        error,
+      });
     }
   }
 

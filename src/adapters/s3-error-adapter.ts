@@ -1,3 +1,5 @@
+import { DEFAULT_PREFIX, reportFailure } from '../fail.js';
+import { SerialQueue } from '../queue.js';
 import { resolveEntryId } from '../entry-id.js';
 import { generateId } from '../uuid.js';
 import { resolveTimeoutMs, timeoutMessage, withTimeout } from '../timeout.js';
@@ -115,7 +117,7 @@ export class S3ErrorAdapter<
   private readonly timeoutMs: number;
   private buffer: S3Record[] = [];
   private timer: ReturnType<typeof setTimeout> | null = null;
-  private flushQueue: Promise<unknown> = Promise.resolve();
+  private readonly flushQueue: SerialQueue = new SerialQueue();
 
   /** @throws {RangeError} if `bucket` is empty or the batch options are invalid. */
   constructor(
@@ -128,7 +130,7 @@ export class S3ErrorAdapter<
     this.contentType =
       options.contentType ??
       (this.batch === undefined ? 'application/json' : 'application/x-ndjson');
-    this.logPrefix = options.prefix ?? '[error-log-adapter]';
+    this.logPrefix = options.prefix ?? DEFAULT_PREFIX;
     this.timeoutMs = resolveTimeoutMs(options.timeoutMs, 'S3ErrorAdapter');
     if (bucket === '') {
       throw new RangeError('S3ErrorAdapter: bucket must not be empty.');
@@ -178,12 +180,9 @@ export class S3ErrorAdapter<
    * Entries from a failed upload stay buffered and are retried by the next flush.
    */
   flush(): Promise<ErrorLogResult> {
-    const result: Promise<ErrorLogResult> = this.flushQueue.then(() =>
+    return this.flushQueue.run((): Promise<ErrorLogResult> =>
       this.uploadBuffered()
     );
-    // uploadBuffered() never rejects, but keep the queue alive no matter what.
-    this.flushQueue = result.catch(() => undefined);
-    return result;
   }
 
   private async addToBatch(
@@ -261,14 +260,16 @@ export class S3ErrorAdapter<
   }
 
   private fail(error: unknown, bufferedCount?: number): ErrorLogResult {
-    console.error(`${this.logPrefix} S3ErrorAdapter:`, error);
     const retry: string =
       bufferedCount === undefined
         ? ''
         : ` (${bufferedCount} buffered ${bufferedCount === 1 ? 'entry was' : 'entries were'} kept for the next flush)`;
-    return {
-      ok: false,
-      error: `S3ErrorAdapter failed to upload to bucket "${this.bucket}": ${describeError(error)}${retry}`,
-    };
+    return reportFailure({
+      adapterName: 'S3ErrorAdapter',
+      prefix: this.logPrefix,
+      action: `to upload to bucket "${this.bucket}"`,
+      error,
+      reason: `${describeError(error)}${retry}`,
+    });
   }
 }

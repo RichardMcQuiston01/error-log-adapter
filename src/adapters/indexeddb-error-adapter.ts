@@ -1,6 +1,7 @@
+import { DEFAULT_PREFIX, reportFailure } from '../fail.js';
 import { hasCallerId, resolveEntryId } from '../entry-id.js';
 import { resolveTimeoutMs, timeoutMessage, withTimeout } from '../timeout.js';
-import { describeError, serializeEntry } from '../serialize.js';
+import { serializeEntry } from '../serialize.js';
 import type { SerializedErrorLogEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
@@ -115,7 +116,7 @@ export class IndexedDbErrorAdapter<
     options: IndexedDbErrorOptions = {}
   ) {
     this.storeName = options.storeName ?? DEFAULT_STORE_NAME;
-    this.prefix = options.prefix ?? '[error-log-adapter]';
+    this.prefix = options.prefix ?? DEFAULT_PREFIX;
     this.timeoutMs = resolveTimeoutMs(
       options.timeoutMs,
       'IndexedDbErrorAdapter'
@@ -131,11 +132,12 @@ export class IndexedDbErrorAdapter<
       await this.write(record, hasCallerId(entry));
       return { ok: true };
     } catch (error: unknown) {
-      console.error(`${this.prefix} IndexedDbErrorAdapter:`, error);
-      return {
-        ok: false,
-        error: `IndexedDbErrorAdapter failed to write to object store "${this.storeName}": ${describeError(error)}`,
-      };
+      return reportFailure({
+        adapterName: 'IndexedDbErrorAdapter',
+        prefix: this.prefix,
+        action: `to write to object store "${this.storeName}"`,
+        error,
+      });
     }
   }
 

@@ -1,6 +1,7 @@
+import { DEFAULT_PREFIX, reportFailure } from '../fail.js';
 import { hasCallerId, resolveEntryId } from '../entry-id.js';
 import { resolveTimeoutMs, timeoutMessage, withTimeout } from '../timeout.js';
-import { describeError, serializeEntry } from '../serialize.js';
+import { serializeEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
   ErrorLogEntry,
@@ -43,7 +44,7 @@ export class MongoDbErrorAdapter<
     private readonly collection: CollectionLike,
     options: MongoDbErrorOptions = {}
   ) {
-    this.prefix = options.prefix ?? '[error-log-adapter]';
+    this.prefix = options.prefix ?? DEFAULT_PREFIX;
     this.timeoutMs = resolveTimeoutMs(options.timeoutMs, 'MongoDbErrorAdapter');
   }
 
@@ -63,11 +64,12 @@ export class MongoDbErrorAdapter<
         // The same id was stored before: this call is a retry that already succeeded.
         return { ok: true };
       }
-      console.error(`${this.prefix} MongoDbErrorAdapter:`, error);
-      return {
-        ok: false,
-        error: `MongoDbErrorAdapter failed to insert entry: ${describeError(error)}`,
-      };
+      return reportFailure({
+        adapterName: 'MongoDbErrorAdapter',
+        prefix: this.prefix,
+        action: 'to insert entry',
+        error,
+      });
     }
   }
 }

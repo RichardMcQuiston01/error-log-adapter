@@ -1,22 +1,19 @@
+import { DEFAULT_PREFIX, reportFailure } from '../fail.js';
+import { DEFAULT_TABLE_NAME, assertIdentifier } from '../sql-ident.js';
 import { resolveEntryId } from '../entry-id.js';
 import { resolveTimeoutMs, timeoutMessage, withTimeout } from '../timeout.js';
-import { describeError, serializeEntry } from '../serialize.js';
+import { serializeEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
   ErrorLogEntry,
   ErrorLogResult,
 } from '../types.js';
 
-/** Default table name. */
-export const DEFAULT_TABLE_NAME = 'error_log';
-
 /**
  * Longest allowed table name. The index name adds `_occurred_at_idx` (16
  * characters) and Postgres limits identifiers to 63.
  */
 export const MAX_TABLE_NAME_LENGTH = 47;
-
-const IDENTIFIER_PATTERN: RegExp = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 export type SqlDialect = 'postgres' | 'mysql';
 
@@ -46,16 +43,7 @@ export interface SqlErrorOptions {
 
 /** Throws a descriptive error unless `tableName` is a short, plain SQL identifier. */
 function assertValidTableName(tableName: string, adapterName: string): void {
-  if (!IDENTIFIER_PATTERN.test(tableName)) {
-    throw new RangeError(
-      `${adapterName}: invalid table name "${tableName}". Use only letters, digits and underscores, and do not start with a digit.`
-    );
-  }
-  if (tableName.length > MAX_TABLE_NAME_LENGTH) {
-    throw new RangeError(
-      `${adapterName}: table name "${tableName}" is ${tableName.length} characters long, but the limit is ${MAX_TABLE_NAME_LENGTH}.`
-    );
-  }
+  assertIdentifier(tableName, 'table name', adapterName, MAX_TABLE_NAME_LENGTH);
 }
 
 function quoteIdentifier(dialect: SqlDialect, identifier: string): string {
@@ -147,7 +135,7 @@ abstract class SqlErrorAdapter<
     this.tableName = options.tableName ?? DEFAULT_TABLE_NAME;
     assertValidTableName(this.tableName, adapterName);
     this.createTable = options.createTable ?? true;
-    this.prefix = options.prefix ?? '[error-log-adapter]';
+    this.prefix = options.prefix ?? DEFAULT_PREFIX;
     this.timeoutMs = resolveTimeoutMs(options.timeoutMs, adapterName);
   }
 
@@ -176,11 +164,12 @@ abstract class SqlErrorAdapter<
       await this.query(this.insertSql(), params);
       return { ok: true };
     } catch (error: unknown) {
-      console.error(`${this.prefix} ${this.adapterName}:`, error);
-      return {
-        ok: false,
-        error: `${this.adapterName} failed to write to table "${this.tableName}": ${describeError(error)}`,
-      };
+      return reportFailure({
+        adapterName: this.adapterName,
+        prefix: this.prefix,
+        action: `to write to table "${this.tableName}"`,
+        error,
+      });
     }
   }
 
