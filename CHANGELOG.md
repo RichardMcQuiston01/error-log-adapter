@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## Unreleased
+
+### Added
+
+- `ErrorLogEntry.id`: an optional UUID that identifies an entry. Without it every `log` call gets a new random id, as before. With it, logging the same entry again is safe on the sinks that can tell: Postgres, MySQL and SQLite store it once (`ON CONFLICT` / `ON DUPLICATE KEY`), MongoDB and Supabase count a duplicate key as success, Firestore and the Realtime Database overwrite the same document or key, IndexedDB, Web Storage and the JSON `array` file replace the earlier record, and the webhook sends the `id` in its body. S3 overwrites the same object only when the retry also has the same `timestamp`. Redis, the flat file, the NDJSON file and the console cannot detect a repeat. An `id` that is not a UUID makes `log` return `ok: false`. A Realtime Database reference needs `child(key).set(value)` for entries that carry an `id`.
+- `timeoutMs` (default 10 000 ms, `Infinity` to wait without limit) on the webhook, MongoDB, Postgres, MySQL, SQLite, Supabase, Redis, S3 and IndexedDB adapters, so `log` can no longer hang when a sink stalls. A timeout returns `ok: false` and says the entry may or may not have been stored. The webhook aborts its request; the others stop waiting, since drivers cannot cancel a call. `CompositeErrorAdapter` takes `{ timeoutMs }` too (default 30 000 ms) so one hung adapter cannot hold back the others. The Firebase adapters use the same helper.
+- `WebhookErrorAdapter` option `allowInsecure`, `WebStorageErrorAdapter` option `locks`, `buildMySqlWidenColumnsSql`, `SupabaseSetupOptions.allowPublicInsert`, and the exported types `CompositeErrorOptions`, `LockManagerLike` and `IdbRequestLike`.
+- A `test-windows` CI job, CI on pushes to `dev`, and GitHub Actions pinned to commit SHAs with Dependabot keeping the pins current.
+
+### Changed
+
+- **Webhook:** the URL must be `https://` (or `http://localhost`, `127.0.0.1`, `[::1]`) unless `allowInsecure: true`; an invalid or other URL throws a `RangeError` from the constructor. Redirects are no longer followed: a 301, 302, 303, 307 or 308 returns `ok: false` instead of delivering a body-less `GET` (302, 303) or re-sending the entry and your headers to another host (307, 308). Failure messages contain only the origin, never the path or query, because webhook URLs often hold a secret.
+- **Supabase:** `buildSupabaseSetupSql` no longer emits `WITH CHECK (true)`. Any policy limits `code` and `source` to 255 characters, `message` to 4096 and `cause` to 8192 bytes, and listing `anon` or `public` in `insertRoles` throws unless `allowPublicInsert: true`. Prefer `authenticated`, or log from a server with the service role key. `SupabaseErrorAdapter` now rejects a `tableName` that is not letters, digits and underscores in the constructor instead of at insert time.
+- **MySQL:** `code` and `source` are `TEXT` instead of `VARCHAR(255)`, so a long source URL no longer makes the insert fail. Tables created by 0.4.0 or earlier keep the old columns; run the statement from `buildMySqlWidenColumnsSql()` once.
+- `serializeEntry` and `serializeCause` always return something `JSON.stringify` accepts. Nested `Error.cause` chains and `AggregateError.errors` are kept, an `Error` inside a plain object or array (or from another realm) is no longer stored as `{}`, and circular references, `BigInt`, `Symbol`, functions and throwing getters become short markers (`[Circular]`, `[Truncated]` past 6 levels) instead of making `log` return `ok: false`.
+- **IndexedDB:** a failed write reports the real error (`request failed: ConstraintError: ...` instead of `no details provided`), and the error events are handled so a failed log write no longer reaches an application's own `onerror` on the database.
+- **Web Storage:** an unreadable stored value is copied to `<key>.corrupt` before it is replaced, writes take a `navigator.locks` lock when the browser has one (this reduces lost entries between `localStorage` tabs but cannot remove them), and a UUID is generated even on an insecure `http://` page, where `crypto.randomUUID` does not exist.
+- Firestore and Realtime Database: the timeout message and docs no longer imply a retried `log` cannot duplicate; give the entry an `id` for that.
+- Internal: shared identifier checks, failure reporting and a serial write queue replace code that was copied between adapters. Error messages are unchanged.
+
+### Fixed
+
+- The flat file and JSON file adapters failed on every call for a file at the root of a Windows drive (`C:\error.log`), because `mkdir` was attempted on `C:`.
+- README now documents every adapter, the `id` field, timeouts and the per-adapter options.
+
 ## 0.4.0
 
 - `SupabaseErrorAdapter` writes entries to a Supabase table through `supabase-js` (any client with `from(table).insert(row)` works). Rows use the same columns as the Postgres adapter's `error_log` table. `supabase-js` returns failures instead of throwing, so the adapter reads the returned error and reports its message, code, details and hint, or the HTTP status when the error has no message. `buildSupabaseSetupSql` returns the SQL to run once in the Supabase SQL editor: the table, row level security, and an optional insert-only policy for roles such as `anon`. Checked against a real PostgREST server with `supabase-js` 2.118, including a row level security rejection, a missing table, a bad key and an unreachable server.
