@@ -15,6 +15,7 @@ export type {
   MongoDbErrorOptions,
 } from './adapters/mongodb-error-adapter.js';
 export { CompositeErrorAdapter } from './adapters/composite-error-adapter.js';
+export type { CompositeErrorOptions } from './adapters/composite-error-adapter.js';
 export {
   IndexedDbErrorAdapter,
   createErrorLogStore,
@@ -22,6 +23,7 @@ export {
 export type {
   IdbDatabaseLike,
   IdbObjectStoreLike,
+  IdbRequestLike,
   IdbTransactionLike,
   IdbUpgradeDatabaseLike,
   IndexedDbErrorOptions,
@@ -37,6 +39,7 @@ export type {
 } from './adapters/sqlite-error-adapter.js';
 export { WebStorageErrorAdapter } from './adapters/web-storage-error-adapter.js';
 export type {
+  LockManagerLike,
   StorageLike,
   WebStorageErrorOptions,
   WebStorageErrorRecord,
