@@ -1,3 +1,4 @@
+import { DEFAULT_PREFIX, reportFailure } from '../fail.js';
 import { resolveEntryId } from '../entry-id.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import type { SerializedErrorLogEntry } from '../serialize.js';
@@ -92,7 +93,7 @@ export class WebStorageErrorAdapter<
   ) {
     this.key = options.key ?? DEFAULT_STORAGE_KEY;
     this.maxEntries = options.maxEntries ?? DEFAULT_MAX_ENTRIES;
-    this.prefix = options.prefix ?? '[error-log-adapter]';
+    this.prefix = options.prefix ?? DEFAULT_PREFIX;
     this.locks =
       options.locks === undefined ? defaultLockManager() : options.locks;
     if (!Number.isInteger(this.maxEntries) || this.maxEntries < 1) {
@@ -111,11 +112,12 @@ export class WebStorageErrorAdapter<
       await this.appendLocked(record);
       return { ok: true };
     } catch (error: unknown) {
-      console.error(`${this.prefix} WebStorageErrorAdapter:`, error);
-      return {
-        ok: false,
-        error: `WebStorageErrorAdapter failed to write to storage key "${this.key}": ${describeError(error)}`,
-      };
+      return reportFailure({
+        adapterName: 'WebStorageErrorAdapter',
+        prefix: this.prefix,
+        action: `to write to storage key "${this.key}"`,
+        error,
+      });
     }
   }
 

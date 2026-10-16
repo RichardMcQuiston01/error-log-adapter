@@ -1,10 +1,11 @@
+import { DEFAULT_PREFIX, reportFailure } from '../fail.js';
 import { hasCallerId, resolveEntryId } from '../entry-id.js';
 import {
   DEFAULT_TIMEOUT_MS,
   resolveTimeoutMs,
   withTimeout,
 } from '../timeout.js';
-import { describeError, serializeEntry } from '../serialize.js';
+import { serializeEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
   ErrorLogEntry,
@@ -136,7 +137,7 @@ export class FirestoreErrorAdapter<
     private readonly collection: FirestoreCollectionLike,
     options: FirebaseErrorOptions = {}
   ) {
-    this.prefix = options.prefix ?? '[error-log-adapter]';
+    this.prefix = options.prefix ?? DEFAULT_PREFIX;
     this.timeoutMs = resolveTimeoutMs(
       options.timeoutMs,
       'FirestoreErrorAdapter'
@@ -152,11 +153,12 @@ export class FirestoreErrorAdapter<
       );
       return { ok: true };
     } catch (error: unknown) {
-      console.error(`${this.prefix} FirestoreErrorAdapter:`, error);
-      return {
-        ok: false,
-        error: `FirestoreErrorAdapter failed to write the document: ${describeError(error)}`,
-      };
+      return reportFailure({
+        adapterName: 'FirestoreErrorAdapter',
+        prefix: this.prefix,
+        action: `to write the document`,
+        error,
+      });
     }
   }
 }
@@ -176,7 +178,7 @@ export class RealtimeDatabaseErrorAdapter<
     private readonly reference: RealtimeDatabaseRefLike,
     options: FirebaseErrorOptions = {}
   ) {
-    this.prefix = options.prefix ?? '[error-log-adapter]';
+    this.prefix = options.prefix ?? DEFAULT_PREFIX;
     this.timeoutMs = resolveTimeoutMs(
       options.timeoutMs,
       'RealtimeDatabaseErrorAdapter'
@@ -200,11 +202,12 @@ export class RealtimeDatabaseErrorAdapter<
       await waitForWrite(() => write, this.timeoutMs);
       return { ok: true };
     } catch (error: unknown) {
-      console.error(`${this.prefix} RealtimeDatabaseErrorAdapter:`, error);
-      return {
-        ok: false,
-        error: `RealtimeDatabaseErrorAdapter failed to write the entry: ${describeError(error)}`,
-      };
+      return reportFailure({
+        adapterName: 'RealtimeDatabaseErrorAdapter',
+        prefix: this.prefix,
+        action: `to write the entry`,
+        error,
+      });
     }
   }
 }

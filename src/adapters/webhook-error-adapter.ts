@@ -1,3 +1,4 @@
+import { DEFAULT_PREFIX } from '../fail.js';
 import { hasCallerId, resolveEntryId } from '../entry-id.js';
 import { describeError, serializeEntry } from '../serialize.js';
 import { resolveTimeoutMs, timeoutMessage } from '../timeout.js';
@@ -71,7 +72,7 @@ export class WebhookErrorAdapter<
     private readonly url: string,
     private readonly options: WebhookErrorOptions = {}
   ) {
-    this.prefix = options.prefix ?? '[error-log-adapter]';
+    this.prefix = options.prefix ?? DEFAULT_PREFIX;
     this.timeoutMs = resolveTimeoutMs(options.timeoutMs, 'WebhookErrorAdapter');
     this.target = parseWebhookUrl(url, options.allowInsecure ?? false).origin;
   }

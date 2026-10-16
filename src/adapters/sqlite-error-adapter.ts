@@ -1,16 +1,13 @@
+import { DEFAULT_PREFIX, reportFailure } from '../fail.js';
+import { DEFAULT_TABLE_NAME, assertIdentifier } from '../sql-ident.js';
 import { resolveEntryId } from '../entry-id.js';
 import { resolveTimeoutMs, timeoutMessage, withTimeout } from '../timeout.js';
-import { describeError, serializeEntry } from '../serialize.js';
+import { serializeEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
   ErrorLogEntry,
   ErrorLogResult,
 } from '../types.js';
-
-/** Default table name. */
-export const DEFAULT_TABLE_NAME = 'error_log';
-
-const IDENTIFIER_PATTERN: RegExp = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /**
  * The only thing this adapter needs from a SQLite driver: run one statement
@@ -45,11 +42,7 @@ export interface SqliteErrorOptions {
 
 /** Throws a descriptive error unless `tableName` is a plain SQL identifier. */
 function assertValidTableName(tableName: string): void {
-  if (!IDENTIFIER_PATTERN.test(tableName)) {
-    throw new RangeError(
-      `SqliteErrorAdapter: invalid table name "${tableName}". Use only letters, digits and underscores, and do not start with a digit.`
-    );
-  }
+  assertIdentifier(tableName, 'table name', 'SqliteErrorAdapter');
 }
 
 /**
@@ -91,7 +84,7 @@ export class SqliteErrorAdapter<
     this.tableName = options.tableName ?? DEFAULT_TABLE_NAME;
     assertValidTableName(this.tableName);
     this.createTable = options.createTable ?? true;
-    this.prefix = options.prefix ?? '[error-log-adapter]';
+    this.prefix = options.prefix ?? DEFAULT_PREFIX;
     this.timeoutMs = resolveTimeoutMs(options.timeoutMs, 'SqliteErrorAdapter');
   }
 
@@ -114,11 +107,12 @@ export class SqliteErrorAdapter<
       );
       return { ok: true };
     } catch (error: unknown) {
-      console.error(`${this.prefix} SqliteErrorAdapter:`, error);
-      return {
-        ok: false,
-        error: `SqliteErrorAdapter failed to write to table "${this.tableName}": ${describeError(error)}`,
-      };
+      return reportFailure({
+        adapterName: 'SqliteErrorAdapter',
+        prefix: this.prefix,
+        action: `to write to table "${this.tableName}"`,
+        error,
+      });
     }
   }
 

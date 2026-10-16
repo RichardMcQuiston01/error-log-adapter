@@ -190,6 +190,17 @@ describe('SupabaseErrorAdapter', () => {
     expect(spy.mock.calls[0][0]).toBe('[app] SupabaseErrorAdapter:');
   });
 
+  it.each(['bad name', 'a-b', 'x;DROP', '1table', 'public.error_log', ''])(
+    'rejects the table name %j in the constructor, not at insert time',
+    (tableName: string) => {
+      const { client, from } = fakeClient();
+      expect(() => new SupabaseErrorAdapter(client, { tableName })).toThrow(
+        /SupabaseErrorAdapter: invalid table name/
+      );
+      expect(from).not.toHaveBeenCalled();
+    }
+  );
+
   it('rejects an empty table name', () => {
     const { client } = fakeClient();
     expect(() => new SupabaseErrorAdapter(client, { tableName: '  ' })).toThrow(

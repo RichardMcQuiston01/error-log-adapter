@@ -1,3 +1,5 @@
+import { DEFAULT_PREFIX, reportFailure } from '../fail.js';
+import { DEFAULT_TABLE_NAME, assertIdentifier } from '../sql-ident.js';
 import { hasCallerId, resolveEntryId } from '../entry-id.js';
 import { resolveTimeoutMs, timeoutMessage, withTimeout } from '../timeout.js';
 import { describeError, serializeEntry } from '../serialize.js';
@@ -6,10 +8,7 @@ import type {
   ErrorLogEntry,
   ErrorLogResult,
 } from '../types.js';
-import {
-  DEFAULT_TABLE_NAME,
-  buildErrorLogTableDdl,
-} from './sql-error-adapter.js';
+import { buildErrorLogTableDdl } from './sql-error-adapter.js';
 
 /** The row inserted for each entry. The columns match the Postgres adapter's table. */
 export interface SupabaseErrorRow {
@@ -50,7 +49,7 @@ export interface SupabaseClientLike {
 }
 
 export interface SupabaseErrorOptions {
-  /** Table to write to. Defaults to `error_log`. */
+  /** Table to write to. Defaults to `error_log`. Letters, digits and `_` only. */
   tableName?: string;
   /** Text printed before failure messages. Defaults to `[error-log-adapter]`. */
   prefix?: string;
@@ -90,8 +89,6 @@ export interface SupabaseSetupOptions {
   allowPublicInsert?: boolean;
 }
 
-const IDENTIFIER_PATTERN: RegExp = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
 /** The `WITH CHECK` condition of the insert policy: every field must be a reasonable size. */
 const INSERT_POLICY_CHECK: string =
   `char_length(code) <= ${POLICY_MAX_CODE_LENGTH} ` +
@@ -115,11 +112,7 @@ export function buildSupabaseSetupSql(
 ): string[] {
   const insertRoles: string[] = options.insertRoles ?? [];
   for (const role of insertRoles) {
-    if (!IDENTIFIER_PATTERN.test(role)) {
-      throw new RangeError(
-        `buildSupabaseSetupSql: invalid role name "${role}". Use only letters, digits and underscores, and do not start with a digit.`
-      );
-    }
+    assertIdentifier(role, 'role name', 'buildSupabaseSetupSql');
     if (
       (role.toLowerCase() === 'anon' || role.toLowerCase() === 'public') &&
       options.allowPublicInsert !== true
@@ -193,18 +186,14 @@ export class SupabaseErrorAdapter<
   private readonly prefix: string;
   private readonly timeoutMs: number;
 
-  /** @throws {RangeError} if `options.tableName` is empty or `options.timeoutMs` is invalid. */
+  /** @throws {RangeError} if `options.tableName` is not a plain identifier or `options.timeoutMs` is invalid. */
   constructor(
     private readonly client: SupabaseClientLike,
     options: SupabaseErrorOptions = {}
   ) {
     this.tableName = options.tableName ?? DEFAULT_TABLE_NAME;
-    if (this.tableName.trim() === '') {
-      throw new RangeError(
-        'SupabaseErrorAdapter: tableName must not be empty.'
-      );
-    }
-    this.prefix = options.prefix ?? '[error-log-adapter]';
+    assertIdentifier(this.tableName, 'table name', 'SupabaseErrorAdapter');
+    this.prefix = options.prefix ?? DEFAULT_PREFIX;
     this.timeoutMs = resolveTimeoutMs(
       options.timeoutMs,
       'SupabaseErrorAdapter'
@@ -233,20 +222,21 @@ export class SupabaseErrorAdapter<
           // Unique violation on the id: this entry was stored by an earlier call.
           return { ok: true };
         }
-        console.error(`${this.prefix} SupabaseErrorAdapter:`, result);
-        return this.fail(describeSupabaseError(result));
+        return this.fail(result, describeSupabaseError(result));
       }
       return { ok: true };
     } catch (error: unknown) {
-      console.error(`${this.prefix} SupabaseErrorAdapter:`, error);
-      return this.fail(describeError(error));
+      return this.fail(error, describeError(error));
     }
   }
 
-  private fail(reason: string): ErrorLogResult {
-    return {
-      ok: false,
-      error: `SupabaseErrorAdapter failed to insert into table "${this.tableName}": ${reason}`,
-    };
+  private fail(logged: unknown, reason: string): ErrorLogResult {
+    return reportFailure({
+      adapterName: 'SupabaseErrorAdapter',
+      prefix: this.prefix,
+      action: `to insert into table "${this.tableName}"`,
+      error: logged,
+      reason,
+    });
   }
 }

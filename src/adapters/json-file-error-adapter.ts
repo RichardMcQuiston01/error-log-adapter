@@ -1,3 +1,5 @@
+import { SerialQueue } from '../queue.js';
+import { DEFAULT_PREFIX, reportFailure } from '../fail.js';
 import { resolveEntryId } from '../entry-id.js';
 import {
   isMissingFileError,
@@ -55,7 +57,7 @@ export class JsonFileErrorAdapter<
   private readonly prefix: string;
   private fs: ReadWriteFileSystemLike | undefined;
   private directoryReady: boolean = false;
-  private queue: Promise<unknown> = Promise.resolve();
+  private readonly queue: SerialQueue = new SerialQueue();
 
   /** @throws {RangeError} if `maxEntries` or `indent` is invalid, or `maxEntries` is used outside array mode. */
   constructor(
@@ -67,7 +69,7 @@ export class JsonFileErrorAdapter<
     this.indent = options.indent ?? DEFAULT_INDENT;
     this.fs = options.fs;
     this.createDirectory = options.createDirectory ?? true;
-    this.prefix = options.prefix ?? '[error-log-adapter]';
+    this.prefix = options.prefix ?? DEFAULT_PREFIX;
     if (this.maxEntries !== undefined) {
       if (this.mode !== 'array') {
         throw new RangeError(
@@ -88,12 +90,7 @@ export class JsonFileErrorAdapter<
   }
 
   log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
-    const result: Promise<ErrorLogResult> = this.queue.then(() =>
-      this.write(entry)
-    );
-    // write() never rejects, but keep the queue alive no matter what.
-    this.queue = result.catch(() => undefined);
-    return result;
+    return this.queue.run((): Promise<ErrorLogResult> => this.write(entry));
   }
 
   private async write(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
@@ -111,11 +108,12 @@ export class JsonFileErrorAdapter<
       }
       return { ok: true };
     } catch (error: unknown) {
-      console.error(`${this.prefix} JsonFileErrorAdapter:`, error);
-      return {
-        ok: false,
-        error: `JsonFileErrorAdapter failed to write "${this.filePath}" in ${this.mode} mode: ${describeError(error)}`,
-      };
+      return reportFailure({
+        adapterName: 'JsonFileErrorAdapter',
+        prefix: this.prefix,
+        action: `to write "${this.filePath}" in ${this.mode} mode`,
+        error,
+      });
     }
   }
 

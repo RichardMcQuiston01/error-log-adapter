@@ -1,3 +1,4 @@
+import { DEFAULT_PREFIX } from '../fail.js';
 import type {
   ErrorLogAdapter,
   ErrorLogEntry,
@@ -15,7 +16,7 @@ export class ConsoleErrorAdapter<
   private readonly prefix: string;
 
   constructor(options: ConsoleErrorOptions = {}) {
-    this.prefix = options.prefix ?? '[error-log-adapter]';
+    this.prefix = options.prefix ?? DEFAULT_PREFIX;
   }
 
   async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
