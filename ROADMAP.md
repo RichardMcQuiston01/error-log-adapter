@@ -26,6 +26,7 @@ Planned adapters, in priority order.
 - S3 / DigitalOcean Spaces (and other S3-compatible stores): one object per entry or batched
 - Firebase: Firestore and Realtime Database
 - Supabase: through `supabase-js` (for a direct connection, use the Postgres adapter)
+- Event emitter: each entry as an event on Node `EventEmitter`, mitt, or an `EventTarget` wrapper
 
 ## Next Up
 
@@ -45,13 +46,7 @@ The base adapter is already shipped. Remaining work:
 - Scope: one log group/stream per adapter instance; handle sequence tokens and the batch size limit.
 - SNS publishing could share the same client pattern later.
 
-### 3. Event Emitter
-
-- Emit each entry as an event on a user-supplied emitter (anything with `emit(name, payload)`).
-- Cheap to build and useful for in-process hooks: UI toasts, metrics counters, and test assertions.
-- Scope: no dependencies, and it works with Node `EventEmitter`, `EventTarget` wrappers, and mitt-style emitters.
-
-### 4. WebSocket
+### 3. WebSocket
 
 - Send JSON entries over a caller-owned socket (anything with `send` and `readyState`).
 - Lowest priority; keep it thin. The caller owns connect and reconnect.

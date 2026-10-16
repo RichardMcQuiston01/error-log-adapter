@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### Added
+
+- `EventEmitterErrorAdapter` emits each entry as an `error-log` event on an emitter you own, for in-process hooks such as a toast, a metrics counter or a test assertion. Anything with `emit(name, payload)` works: Node's `EventEmitter` and mitt as they are, a browser `EventTarget` through a one-line wrapper. The payload is the stored record (UUID `id` plus the serialized entry), and a caller-supplied `id` is passed through. Listeners run synchronously, so one that throws makes `log` return `ok: false` with its message. Options: `eventName`, and `requireListener` to report an emit that reached nobody (Node's `emit` returns `false`) as a failure.
+
 ## 0.5.0
 
 ### Added
