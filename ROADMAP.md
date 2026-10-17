@@ -27,6 +27,7 @@ Planned adapters, in priority order.
 - Firebase: Firestore and Realtime Database
 - Supabase: through `supabase-js` (for a direct connection, use the Postgres adapter)
 - Event emitter: each entry as an event on Node `EventEmitter`, mitt, or an `EventTarget` wrapper
+- WebSocket: JSON entries over a caller-owned socket (anything with `send` and `readyState`); fails descriptively when the socket is not open
 
 ## Next Up
 
@@ -42,12 +43,6 @@ Retry with backoff, the request timeout and the HMAC signature header are shippe
 - Worth it for apps running outside managed AWS runtimes (Lambda and ECS already ship stdout to CloudWatch).
 - Scope: one log group/stream per adapter instance; handle sequence tokens and the batch size limit.
 - SNS publishing could share the same client pattern later.
-
-### 3. WebSocket
-
-- Send JSON entries over a caller-owned socket (anything with `send` and `readyState`).
-- Lowest priority; keep it thin. The caller owns connect and reconnect.
-- Scope: return a descriptive failure if the socket is not open, with no internal buffering in the first version.
 
 ## Cross-Cutting Work
 

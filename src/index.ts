@@ -106,3 +106,8 @@ export type {
   EventEmitterErrorOptions,
   EventEmitterErrorRecord,
 } from './adapters/event-emitter-error-adapter.js';
+export { WebSocketErrorAdapter } from './adapters/websocket-error-adapter.js';
+export type {
+  WebSocketErrorOptions,
+  WebSocketLike,
+} from './adapters/websocket-error-adapter.js';
