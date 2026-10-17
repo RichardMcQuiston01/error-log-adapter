@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ErrorLogEntry } from '../types.js';
 import { WebhookErrorAdapter } from './webhook-error-adapter.js';
@@ -266,6 +267,296 @@ describe('WebhookErrorAdapter', () => {
         () =>
           new WebhookErrorAdapter('https://example.com/e', { timeoutMs: value })
       ).toThrow(/WebhookErrorAdapter: timeoutMs must be a positive number/);
+    });
+  });
+
+  describe('retries', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    const URL_ = 'https://example.com/errors';
+    const ok = { ok: true, status: 200 };
+    const status = (code: number, headers: Record<string, string> = {}) => ({
+      ok: false,
+      status: code,
+      headers: new Headers(headers),
+    });
+
+    it('sends once by default, without an id', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(status(503));
+      vi.stubGlobal('fetch', mockFetch);
+      const result = await new WebhookErrorAdapter(URL_).log(ENTRY);
+      expect(result.ok).toBe(false);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+      expect(JSON.parse(init.body as string)).toEqual(ENTRY);
+    });
+
+    it('retries a 5xx with doubling waits and succeeds', async () => {
+      vi.useFakeTimers();
+      vi.spyOn(Math, 'random').mockReturnValue(1);
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce(status(503))
+        .mockResolvedValueOnce(status(500))
+        .mockResolvedValueOnce(ok);
+      vi.stubGlobal('fetch', mockFetch);
+
+      const pending = new WebhookErrorAdapter(URL_, {
+        retries: 3,
+        retryDelayMs: 100,
+      }).log(ENTRY);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(99);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(199);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(1);
+
+      expect(await pending).toEqual({ ok: true });
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+    });
+
+    it('sends the same body, with an id, on every attempt', async () => {
+      vi.useFakeTimers();
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce(status(502))
+        .mockResolvedValueOnce(ok);
+      vi.stubGlobal('fetch', mockFetch);
+      const pending = new WebhookErrorAdapter(URL_, { retries: 1 }).log(ENTRY);
+      await vi.runAllTimersAsync();
+      await pending;
+      const bodies = mockFetch.mock.calls.map(
+        ([, init]: [string, RequestInit]) => init.body as string
+      );
+      expect(bodies[0]).toBe(bodies[1]);
+      expect(JSON.parse(bodies[0] as string).id).toMatch(/^[0-9a-f-]{36}$/);
+    });
+
+    it('reports the last failure and the attempt count when retries run out', async () => {
+      vi.useFakeTimers();
+      const mockFetch = vi.fn().mockResolvedValue(status(500));
+      vi.stubGlobal('fetch', mockFetch);
+      const pending = new WebhookErrorAdapter(URL_, { retries: 2 }).log(ENTRY);
+      await vi.runAllTimersAsync();
+      const result = await pending;
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+      expect(result.error).toBe(
+        'WebhookErrorAdapter failed: webhook https://example.com responded with HTTP 500 (after 3 attempts)'
+      );
+    });
+
+    it.each([400, 401, 403, 404, 422])(
+      'does not retry HTTP %i',
+      async (code: number) => {
+        const mockFetch = vi.fn().mockResolvedValue(status(code));
+        vi.stubGlobal('fetch', mockFetch);
+        await new WebhookErrorAdapter(URL_, { retries: 3 }).log(ENTRY);
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+      }
+    );
+
+    it.each([408, 425, 429])('retries HTTP %i', async (code: number) => {
+      vi.useFakeTimers();
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce(status(code))
+        .mockResolvedValueOnce(ok);
+      vi.stubGlobal('fetch', mockFetch);
+      const pending = new WebhookErrorAdapter(URL_, { retries: 1 }).log(ENTRY);
+      await vi.runAllTimersAsync();
+      expect(await pending).toEqual({ ok: true });
+    });
+
+    it('does not retry a redirect', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(status(307));
+      vi.stubGlobal('fetch', mockFetch);
+      await new WebhookErrorAdapter(URL_, { retries: 3 }).log(ENTRY);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries a network error and logs only the final one', async () => {
+      vi.useFakeTimers();
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const mockFetch = vi
+        .fn()
+        .mockRejectedValueOnce(new TypeError('fetch failed'))
+        .mockResolvedValueOnce(ok);
+      vi.stubGlobal('fetch', mockFetch);
+      const pending = new WebhookErrorAdapter(URL_, { retries: 1 }).log(ENTRY);
+      await vi.runAllTimersAsync();
+      expect(await pending).toEqual({ ok: true });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('retries after a timeout, with the timeout applying to each attempt', async () => {
+      vi.useFakeTimers();
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const mockFetch = vi
+        .fn()
+        .mockImplementationOnce(
+          (_url: string, init: RequestInit) =>
+            new Promise((_resolve, reject) => {
+              init.signal?.addEventListener('abort', () =>
+                reject(new DOMException('aborted', 'AbortError'))
+              );
+            })
+        )
+        .mockResolvedValueOnce(ok);
+      vi.stubGlobal('fetch', mockFetch);
+      const pending = new WebhookErrorAdapter(URL_, {
+        retries: 1,
+        timeoutMs: 1000,
+      }).log(ENTRY);
+      await vi.runAllTimersAsync();
+      expect(await pending).toEqual({ ok: true });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('honors Retry-After in seconds, capped at maxRetryDelayMs', async () => {
+      vi.useFakeTimers();
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce(status(429, { 'Retry-After': '2' }))
+        .mockResolvedValueOnce(status(429, { 'Retry-After': '3600' }))
+        .mockResolvedValueOnce(ok);
+      vi.stubGlobal('fetch', mockFetch);
+      const pending = new WebhookErrorAdapter(URL_, {
+        retries: 2,
+        maxRetryDelayMs: 5000,
+      }).log(ENTRY);
+      await vi.advanceTimersByTimeAsync(1999);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(4999);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await pending).toEqual({ ok: true });
+    });
+
+    it('honors a Retry-After HTTP date', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce(
+          status(503, { 'Retry-After': 'Thu, 01 Jan 2026 00:00:03 GMT' })
+        )
+        .mockResolvedValueOnce(ok);
+      vi.stubGlobal('fetch', mockFetch);
+      const pending = new WebhookErrorAdapter(URL_, {
+        retries: 1,
+        maxRetryDelayMs: 10_000,
+      }).log(ENTRY);
+      await vi.advanceTimersByTimeAsync(2999);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await pending).toEqual({ ok: true });
+    });
+
+    it('rejects invalid retry options', () => {
+      const bad: Record<string, unknown>[] = [
+        { retries: -1 },
+        { retries: 1.5 },
+        { retries: NaN },
+        { retryDelayMs: 0 },
+        { retryDelayMs: Infinity },
+        { retryDelayMs: 1000, maxRetryDelayMs: 500 },
+        { signingSecret: '' },
+      ];
+      for (const options of bad) {
+        expect(() => new WebhookErrorAdapter(URL_, options)).toThrow(
+          RangeError
+        );
+      }
+    });
+
+    it('reports an invalid entry id without sending', async () => {
+      const mockFetch = vi.fn();
+      vi.stubGlobal('fetch', mockFetch);
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const result = await new WebhookErrorAdapter(URL_, { retries: 2 }).log({
+        ...ENTRY,
+        id: 'nope',
+      });
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('entry.id must be a UUID');
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('signingSecret', () => {
+    const URL_ = 'https://example.com/errors';
+
+    it('signs timestamp.body with HMAC-SHA256', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+      vi.stubGlobal('fetch', mockFetch);
+      await new WebhookErrorAdapter(URL_, { signingSecret: 's3cret' }).log(
+        ENTRY
+      );
+      const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+      const headers = init.headers as Record<string, string>;
+      const expected: string = createHmac('sha256', 's3cret')
+        .update(`${headers['X-Signature-Timestamp']}.${init.body as string}`)
+        .digest('hex');
+      expect(headers['X-Signature-256']).toBe(`sha256=${expected}`);
+      expect(Number(headers['X-Signature-Timestamp'])).toBeGreaterThan(1.7e9);
+    });
+
+    it('sends no signature headers without a secret', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+      vi.stubGlobal('fetch', mockFetch);
+      await new WebhookErrorAdapter(URL_).log(ENTRY);
+      const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+      expect(init.headers).not.toHaveProperty('X-Signature-256');
+    });
+
+    it('signs again, with a fresh timestamp, on each retry', async () => {
+      const now = vi
+        .spyOn(Date, 'now')
+        .mockReturnValueOnce(1_900_000_000_000)
+        .mockReturnValue(1_900_000_002_000);
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          headers: new Headers({ 'Retry-After': '0' }),
+        })
+        .mockResolvedValueOnce({ ok: true, status: 200 });
+      vi.stubGlobal('fetch', mockFetch);
+      const result = await new WebhookErrorAdapter(URL_, {
+        signingSecret: 'k',
+        retries: 1,
+      }).log(ENTRY);
+      now.mockRestore();
+      expect(result).toEqual({ ok: true });
+      const stamps: string[] = mockFetch.mock.calls.map(
+        ([, init]: [string, RequestInit]) =>
+          (init.headers as Record<string, string>)['X-Signature-Timestamp']
+      );
+      expect(stamps).toEqual(['1900000000', '1900000002']);
+    });
+
+    it('fails without sending or retrying when Web Crypto is missing', async () => {
+      const mockFetch = vi.fn();
+      vi.stubGlobal('fetch', mockFetch);
+      vi.stubGlobal('crypto', undefined);
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const result = await new WebhookErrorAdapter(URL_, {
+        signingSecret: 'k',
+        retries: 2,
+      }).log(ENTRY);
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('signingSecret needs Web Crypto');
+      expect(mockFetch).not.toHaveBeenCalled();
     });
   });
 });
