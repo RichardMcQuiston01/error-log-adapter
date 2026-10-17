@@ -30,14 +30,11 @@ Planned adapters, in priority order.
 
 ## Next Up
 
-### 1. Webhook improvements
+### 1. Webhook batching
 
-The base adapter is already shipped. Remaining work:
+Retry with backoff, the request timeout and the HMAC signature header are shipped. Remaining work:
 
-- Retry with exponential backoff.
-- Request timeout.
-- Optional batching.
-- Optional HMAC signature header.
+- Optional batching of entries into one request (needs a flush story, since `log()` resolves per entry; likely shares the cross-cutting batching wrapper below).
 
 ### 2. AWS CloudWatch Logs
 
