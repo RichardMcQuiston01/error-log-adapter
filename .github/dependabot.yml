@@ -3,5 +3,7 @@ updates:
   # Keeps the commit SHAs that pin each action in .github/workflows up to date.
   - package-ecosystem: github-actions
     directory: /
+    # Version bumps go through dev like any other change, not straight to main.
+    target-branch: dev
     schedule:
       interval: weekly

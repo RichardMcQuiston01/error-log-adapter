@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.7.0
+
+### Added
+
+- `WebSocketErrorAdapter` sends each entry as one JSON message (the serialized entry plus its UUID `id`) over a socket you own: the browser `WebSocket`, Node's global `WebSocket`, Deno, Bun or `ws`, since it only needs `send` and `readyState`. It never connects or buffers; when the socket is not open, `log` returns `ok: false` and says whether it is connecting, closing or closed. `ok: true` means the socket accepted the message, not that the server received it.
+
 ## 0.6.0
 
 ### Added
