@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.10.0
+
+### Added
+
+- `FirestoreErrorAdapter` options `expireAfterMs` and `expireField`: add an expiry timestamp (the entry's `timestamp` plus `expireAfterMs`, stored as a Firestore timestamp in `expire_at` by default) to every document, for a Firestore TTL policy to act on. Nothing is deleted until you enable the policy on that field. Off by default. The Realtime Database has no TTL feature, so it is not affected. New exported types `FirestoreErrorOptions` and `FirestoreErrorRecord`.
+
 ## 0.9.0
 
 ### Added

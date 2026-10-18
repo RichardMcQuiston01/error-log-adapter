@@ -7,6 +7,7 @@ import {
 import type {
   FirebaseErrorRecord,
   FirestoreCollectionLike,
+  FirestoreErrorRecord,
   RealtimeDatabaseRefLike,
 } from './firebase-error-adapter.js';
 
@@ -26,10 +27,10 @@ function silenceConsole() {
 function fakeFirestore(): {
   collection: FirestoreCollectionLike;
   doc: ReturnType<typeof vi.fn<[string], unknown>>;
-  set: ReturnType<typeof vi.fn<[FirebaseErrorRecord], Promise<unknown>>>;
+  set: ReturnType<typeof vi.fn<[FirestoreErrorRecord], Promise<unknown>>>;
 } {
   const set = vi
-    .fn<[FirebaseErrorRecord], Promise<unknown>>()
+    .fn<[FirestoreErrorRecord], Promise<unknown>>()
     .mockResolvedValue({});
   const doc = vi.fn<[string], unknown>().mockReturnValue({ set });
   return {
@@ -287,6 +288,103 @@ describe.each([
       expect(() => create(false, { timeoutMs })).toThrowError(
         new RegExp(`${name}: timeoutMs must be a positive number or Infinity`)
       );
+    }
+  );
+});
+
+describe('FirestoreErrorAdapter expiry', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+
+  it('adds no expiry field by default', async () => {
+    const { collection, set } = fakeFirestore();
+    await new FirestoreErrorAdapter(collection).log(ENTRY);
+    expect(set.mock.calls[0][0]).not.toHaveProperty('expire_at');
+  });
+
+  it('stores a Date the entry timestamp plus expireAfterMs in expire_at', async () => {
+    const { collection, set } = fakeFirestore();
+
+    const result = await new FirestoreErrorAdapter(collection, {
+      expireAfterMs: 30 * DAY,
+    }).log(ENTRY);
+
+    expect(result).toEqual({ ok: true });
+    const record = set.mock.calls[0][0] as Record<string, unknown>;
+    expect(record.expire_at).toBeInstanceOf(Date);
+    expect((record.expire_at as Date).toISOString()).toBe(
+      new Date(Date.parse('2026-01-02T03:04:05.678Z') + 30 * DAY).toISOString()
+    );
+    // the other fields are untouched, and timestamp stays a string
+    expect(record.timestamp).toBe('2026-01-02T03:04:05.678Z');
+  });
+
+  it('uses a custom expireField', async () => {
+    const { collection, set } = fakeFirestore();
+    await new FirestoreErrorAdapter(collection, {
+      expireAfterMs: DAY,
+      expireField: 'delete_after',
+    }).log(ENTRY);
+    const record = set.mock.calls[0][0] as Record<string, unknown>;
+    expect(record.delete_after).toBeInstanceOf(Date);
+    expect(record).not.toHaveProperty('expire_at');
+  });
+
+  it('works from the time of logging when the entry has no timestamp', async () => {
+    const { collection, set } = fakeFirestore();
+    const before = Date.now();
+    await new FirestoreErrorAdapter(collection, { expireAfterMs: DAY }).log({
+      code: 'E',
+      message: 'm',
+    });
+    const expiry = (set.mock.calls[0][0] as Record<string, unknown>)
+      .expire_at as Date;
+    expect(expiry.getTime()).toBeGreaterThanOrEqual(before + DAY);
+    expect(expiry.getTime()).toBeLessThanOrEqual(Date.now() + DAY);
+  });
+
+  it('reports a timestamp that is not a date instead of writing a bad expiry', async () => {
+    silenceConsole();
+    const { collection, set } = fakeFirestore();
+    const result = await new FirestoreErrorAdapter(collection, {
+      expireAfterMs: DAY,
+    }).log({ ...ENTRY, timestamp: 'soon' });
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('expiry time cannot be worked out');
+    expect(set).not.toHaveBeenCalled();
+  });
+
+  it('gives the same expiry to a retry with the same id and timestamp', async () => {
+    const { collection, set } = fakeFirestore();
+    const adapter = new FirestoreErrorAdapter(collection, {
+      expireAfterMs: DAY,
+    });
+    const entry = { ...ENTRY, id: '3f2b8c1e-5d4a-4e7b-9a10-2c6d8e0f1a2b' };
+    await adapter.log(entry);
+    await adapter.log(entry);
+    expect((set.mock.calls[0][0] as Record<string, unknown>).expire_at).toEqual(
+      (set.mock.calls[1][0] as Record<string, unknown>).expire_at
+    );
+  });
+
+  it.each([0, -1, NaN, Infinity])('rejects expireAfterMs %s', (value) => {
+    expect(
+      () =>
+        new FirestoreErrorAdapter(fakeFirestore().collection, {
+          expireAfterMs: value,
+        })
+    ).toThrow(/expireAfterMs must be a positive number/);
+  });
+
+  it.each(['', 'id', 'timestamp', 'cause', 'a.b', 'a/b'])(
+    'rejects expireField %j',
+    (field) => {
+      expect(
+        () =>
+          new FirestoreErrorAdapter(fakeFirestore().collection, {
+            expireAfterMs: DAY,
+            expireField: field,
+          })
+      ).toThrow(/expireField must be a name other than/);
     }
   );
 });

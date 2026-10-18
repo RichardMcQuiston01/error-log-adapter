@@ -86,6 +86,8 @@ export type {
   FirebaseErrorOptions,
   FirebaseErrorRecord,
   FirestoreCollectionLike,
+  FirestoreErrorOptions,
+  FirestoreErrorRecord,
   RealtimeDatabaseRefLike,
 } from './adapters/firebase-error-adapter.js';
 export {
