@@ -126,6 +126,8 @@ export type {
   SnsClientLike,
   SnsErrorOptions,
   SnsMessageAttribute,
+  SnsPublishBatchEntry,
+  SnsPublishBatchInput,
   SnsPublishInput,
 } from './adapters/sns-error-adapter.js';
 export { BatchingErrorAdapter } from './adapters/batching-error-adapter.js';
