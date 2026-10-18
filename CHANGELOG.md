@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 0.11.0
+
+### Added
+
+- `JsonFileErrorAdapter` options `maxBytes` and `maxFiles` for `ndjson` mode: rotate the file by size, the same way `FlatFileErrorAdapter` does (`errors.ndjson` becomes `errors.ndjson.1`, older files shift up, the oldest is deleted). Every file holds whole lines, and a failed rotation is reported but the entry is still written. Off by default; `array` mode rejects both options.
+
+### Changed
+
+- The rotation code is now shared by the flat file and JSON file adapters. `FlatFileErrorAdapter` behaves as before, including its error messages.
+
 ## 0.10.0
 
 ### Added
