@@ -1,3 +1,4 @@
+import { backoffDelayMs } from '../backoff.js';
 import { DEFAULT_PREFIX } from '../fail.js';
 import { hasCallerId, resolveEntryId } from '../entry-id.js';
 import { describeError, serializeEntry } from '../serialize.js';
@@ -231,6 +232,38 @@ export class WebhookErrorAdapter<
       );
     }
 
+    return this.deliver(body);
+  }
+
+  /**
+   * Sends several entries in one request, as a JSON array of the same records
+   * `log` sends one at a time (each with an `id`). `BatchingErrorAdapter` uses
+   * this when it wraps a webhook, so the receiver must accept an array. The
+   * whole request succeeds or fails together.
+   */
+  async logBatch(entries: ErrorLogEntry<TCode>[]): Promise<ErrorLogResult> {
+    if (entries.length === 0) {
+      return { ok: true };
+    }
+    let body: string;
+    try {
+      body = JSON.stringify(
+        entries.map((entry: ErrorLogEntry<TCode>) => ({
+          id: resolveEntryId(entry),
+          ...serializeEntry(entry),
+        }))
+      );
+    } catch (error: unknown) {
+      console.error(`${this.prefix} WebhookErrorAdapter:`, error);
+      return this.fail(
+        `could not prepare the entries: ${this.redact(describeError(error))}`
+      );
+    }
+    return this.deliver(body);
+  }
+
+  /** Sends one prepared body, trying again as `retries` allows. */
+  private async deliver(body: string): Promise<ErrorLogResult> {
     let attempt: Attempt = await this.send(body);
     let attempts = 1;
     while (!attempt.ok && attempt.retryable && attempts <= this.retries) {
@@ -253,12 +286,7 @@ export class WebhookErrorAdapter<
     if (retryAfterMs !== undefined) {
       return Math.min(retryAfterMs, this.maxRetryDelayMs);
     }
-    const ceiling: number = Math.min(
-      this.maxRetryDelayMs,
-      this.retryDelayMs * 2 ** (retryNumber - 1)
-    );
-    // Half fixed, half random, so many callers do not retry in lockstep.
-    return ceiling / 2 + (Math.random() * ceiling) / 2;
+    return backoffDelayMs(retryNumber, this.retryDelayMs, this.maxRetryDelayMs);
   }
 
   private async send(body: string): Promise<Attempt> {

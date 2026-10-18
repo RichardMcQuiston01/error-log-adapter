@@ -29,14 +29,11 @@ Planned adapters, in priority order.
 - Event emitter: each entry as an event on Node `EventEmitter`, mitt, or an `EventTarget` wrapper
 - WebSocket: JSON entries over a caller-owned socket (anything with `send` and `readyState`); fails descriptively when the socket is not open
 - AWS CloudWatch Logs: `PutLogEvents` through an injected client, one group/stream per adapter, optional batching within the request limits
+- Batching wrapper: `BatchingErrorAdapter` queues, batches and retries in front of any adapter; the webhook adds `logBatch` (one request, JSON array)
 
 ## Next Up
 
-### 1. Webhook batching
-
-Retry with backoff, the request timeout and the HMAC signature header are shipped. Remaining work:
-
-- Optional batching of entries into one request (needs a flush story, since `log()` resolves per entry; likely shares the cross-cutting batching wrapper below).
+Nothing is queued. Candidates are under Cross-Cutting Work.
 
 ## Cross-Cutting Work
 
@@ -47,4 +44,3 @@ Retry with backoff, the request timeout and the HMAC signature header are shippe
 - Document how to write a custom adapter.
 - Add a CHANGELOG entry for each adapter release.
 - SNS publishing could follow the CloudWatch Logs adapter's injected-client pattern.
-- Consider a shared batching/retry wrapper adapter that can sit in front of any sink.
