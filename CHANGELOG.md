@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 0.9.0
+
+### Added
+
+- `BatchingErrorAdapter` puts a queue in front of any adapter. `log()` returns `ok: true` once the entry is queued, and entries are delivered in order in batches (`batchSize`, `maxWaitMs`) with exponential-backoff retries (`retries`, `retryDelayMs`, `maxRetryDelayMs`). Entries that fail every attempt, or are pushed out of a full buffer (`maxBuffered`), go to `onDrop` and the console, and `flush()` reports them once. It stops a batch at the first failure so a dead sink is not hammered, and uses the wrapped adapter's `logBatch` when it has one. `ok: true` means queued, not stored; call `flush()` before exiting.
+- `WebhookErrorAdapter.logBatch(entries)` sends several entries as one request carrying a JSON array of the usual records (each with an `id`), with the same retries, timeout and signing as `log`. `BatchingErrorAdapter` uses it automatically, so a wrapped webhook receives arrays; pass `useBatchMethod: false` for one request per entry.
+- `BatchCapableAdapter` type for adapters that offer `logBatch`.
+- [docs/custom-adapters.md](./docs/custom-adapters.md): a guide to writing your own adapter (the contract, timeouts, entry ids and safe retries, buffering adapters, testing, a checklist), linked from the README.
+
 ## 0.8.0
 
 ### Added

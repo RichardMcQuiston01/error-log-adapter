@@ -119,3 +119,8 @@ export type {
   CloudWatchLogsErrorOptions,
   CloudWatchPutLogEventsInput,
 } from './adapters/cloudwatch-logs-error-adapter.js';
+export { BatchingErrorAdapter } from './adapters/batching-error-adapter.js';
+export type {
+  BatchCapableAdapter,
+  BatchingErrorOptions,
+} from './adapters/batching-error-adapter.js';
