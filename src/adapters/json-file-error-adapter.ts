@@ -2,6 +2,11 @@ import { SerialQueue } from '../queue.js';
 import { DEFAULT_PREFIX, reportFailure } from '../fail.js';
 import { resolveEntryId } from '../entry-id.js';
 import {
+  DEFAULT_MAX_FILES,
+  assertPositiveInteger,
+  rotateIfNeeded,
+} from '../file-rotation.js';
+import {
   isMissingFileError,
   loadNodeFileSystem,
   parentDirectory,
@@ -32,6 +37,13 @@ export interface JsonFileErrorOptions {
   mode?: 'ndjson' | 'array';
   /** Array mode only: most entries to keep. The oldest are dropped first. */
   maxEntries?: number;
+  /**
+   * NDJSON mode only: rotate the file before it would grow past this many
+   * bytes, moving it to `<path>.1` (older files shift up). Off by default.
+   */
+  maxBytes?: number;
+  /** NDJSON mode only: rotated files to keep (`errors.ndjson.1` is newest). Defaults to `3`. Needs `maxBytes`. */
+  maxFiles?: number;
   /** Array mode only: spaces of indentation. Defaults to `2`; `0` is compact. */
   indent?: number;
   /** File system to write to. Defaults to `node:fs/promises`, loaded on first use. */
@@ -52,6 +64,8 @@ export class JsonFileErrorAdapter<
 > implements ErrorLogAdapter<TCode> {
   private readonly mode: 'ndjson' | 'array';
   private readonly maxEntries: number | undefined;
+  private readonly maxBytes: number | undefined;
+  private readonly maxFiles: number;
   private readonly indent: number;
   private readonly createDirectory: boolean;
   private readonly prefix: string;
@@ -59,13 +73,15 @@ export class JsonFileErrorAdapter<
   private directoryReady: boolean = false;
   private readonly queue: SerialQueue = new SerialQueue();
 
-  /** @throws {RangeError} if `maxEntries` or `indent` is invalid, or `maxEntries` is used outside array mode. */
+  /** @throws {RangeError} if `maxEntries`, `maxBytes`, `maxFiles` or `indent` is invalid, or an option is used in the wrong mode. */
   constructor(
     private readonly filePath: string,
     options: JsonFileErrorOptions = {}
   ) {
     this.mode = options.mode ?? 'ndjson';
     this.maxEntries = options.maxEntries;
+    this.maxBytes = options.maxBytes;
+    this.maxFiles = options.maxFiles ?? DEFAULT_MAX_FILES;
     this.indent = options.indent ?? DEFAULT_INDENT;
     this.fs = options.fs;
     this.createDirectory = options.createDirectory ?? true;
@@ -81,6 +97,20 @@ export class JsonFileErrorAdapter<
           `JsonFileErrorAdapter: maxEntries must be a positive integer, received ${String(this.maxEntries)}.`
         );
       }
+    }
+    if (this.maxBytes !== undefined || options.maxFiles !== undefined) {
+      if (this.mode !== 'ndjson') {
+        throw new RangeError(
+          `JsonFileErrorAdapter: maxBytes and maxFiles only apply to mode "ndjson", but mode is "${this.mode}". Use mode "ndjson", or use maxEntries to limit array mode.`
+        );
+      }
+      if (this.maxBytes === undefined) {
+        throw new RangeError(
+          'JsonFileErrorAdapter: maxFiles needs maxBytes; set maxBytes to turn rotation on.'
+        );
+      }
+      assertPositiveInteger('JsonFileErrorAdapter', this.maxBytes, 'maxBytes');
+      assertPositiveInteger('JsonFileErrorAdapter', this.maxFiles, 'maxFiles');
     }
     if (!Number.isInteger(this.indent) || this.indent < 0) {
       throw new RangeError(
@@ -102,7 +132,17 @@ export class JsonFileErrorAdapter<
       const fs: ReadWriteFileSystemLike = await this.getFileSystem();
       await this.prepareDirectory(fs);
       if (this.mode === 'ndjson') {
-        await fs.appendFile(this.filePath, `${JSON.stringify(record)}\n`);
+        const line: string = `${JSON.stringify(record)}\n`;
+        if (this.maxBytes !== undefined) {
+          await rotateIfNeeded(
+            fs,
+            this.filePath,
+            new TextEncoder().encode(line).length,
+            { maxBytes: this.maxBytes, maxFiles: this.maxFiles },
+            { adapterName: 'JsonFileErrorAdapter', prefix: this.prefix }
+          );
+        }
+        await fs.appendFile(this.filePath, line);
       } else {
         await this.rewriteArray(fs, record);
       }

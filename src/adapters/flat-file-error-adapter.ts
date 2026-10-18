@@ -1,12 +1,13 @@
 import { SerialQueue } from '../queue.js';
 import { DEFAULT_PREFIX, reportFailure } from '../fail.js';
 import {
-  isMissingFileError,
-  loadNodeFileSystem,
-  parentDirectory,
-} from '../file-system.js';
+  DEFAULT_MAX_FILES,
+  assertPositiveInteger,
+  rotateIfNeeded,
+} from '../file-rotation.js';
+import { loadNodeFileSystem, parentDirectory } from '../file-system.js';
 import type { FileSystemLike } from '../file-system.js';
-import { describeError, serializeEntry } from '../serialize.js';
+import { serializeEntry } from '../serialize.js';
 import type { SerializedErrorLogEntry } from '../serialize.js';
 import type {
   ErrorLogAdapter,
@@ -14,8 +15,7 @@ import type {
   ErrorLogResult,
 } from '../types.js';
 
-/** Default number of rotated files kept when `maxBytes` is set. */
-export const DEFAULT_MAX_FILES = 3;
+export { DEFAULT_MAX_FILES };
 
 export interface FlatFileErrorOptions {
   /** File system to write to. Defaults to `node:fs/promises`, loaded on first use. */
@@ -68,14 +68,6 @@ export function formatErrorLogLine(entry: SerializedErrorLogEntry): string {
   );
 }
 
-function assertPositiveInteger(value: number, name: string): void {
-  if (!Number.isInteger(value) || value < 1) {
-    throw new RangeError(
-      `FlatFileErrorAdapter: ${name} must be a positive integer, received ${String(value)}.`
-    );
-  }
-}
-
 /**
  * Appends one text line per entry to a file, optionally rotating it by size.
  * Writes are queued, so concurrent `log` calls never interleave or race a rotation.
@@ -104,9 +96,9 @@ export class FlatFileErrorAdapter<
     this.createDirectory = options.createDirectory ?? true;
     this.prefix = options.prefix ?? DEFAULT_PREFIX;
     if (this.maxBytes !== undefined) {
-      assertPositiveInteger(this.maxBytes, 'maxBytes');
+      assertPositiveInteger('FlatFileErrorAdapter', this.maxBytes, 'maxBytes');
     }
-    assertPositiveInteger(this.maxFiles, 'maxFiles');
+    assertPositiveInteger('FlatFileErrorAdapter', this.maxFiles, 'maxFiles');
   }
 
   log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
@@ -121,7 +113,15 @@ export class FlatFileErrorAdapter<
         ? formatted
         : `${formatted}\n`;
       await this.prepareDirectory(fs);
-      await this.rotateIfNeeded(fs, new TextEncoder().encode(line).length);
+      if (this.maxBytes !== undefined) {
+        await rotateIfNeeded(
+          fs,
+          this.filePath,
+          new TextEncoder().encode(line).length,
+          { maxBytes: this.maxBytes, maxFiles: this.maxFiles },
+          { adapterName: 'FlatFileErrorAdapter', prefix: this.prefix }
+        );
+      }
       await fs.appendFile(this.filePath, line);
       return { ok: true };
     } catch (error: unknown) {
@@ -151,60 +151,5 @@ export class FlatFileErrorAdapter<
       await fs.mkdir(directory, { recursive: true });
     }
     this.directoryReady = true;
-  }
-
-  /**
-   * Moves `app.log` to `app.log.1` (shifting older files up, dropping the
-   * oldest) when the next line would push it past `maxBytes`. A failed rotation
-   * is reported, but the entry is still written so it is not lost.
-   */
-  private async rotateIfNeeded(
-    fs: FileSystemLike,
-    lineBytes: number
-  ): Promise<void> {
-    if (this.maxBytes === undefined) {
-      return;
-    }
-    try {
-      let currentSize: number;
-      try {
-        currentSize = (await fs.stat(this.filePath)).size;
-      } catch (error: unknown) {
-        if (isMissingFileError(error)) {
-          return;
-        }
-        throw error;
-      }
-      if (currentSize === 0 || currentSize + lineBytes <= this.maxBytes) {
-        return;
-      }
-      await fs.rm(`${this.filePath}.${this.maxFiles}`, { force: true });
-      for (let index = this.maxFiles - 1; index >= 1; index -= 1) {
-        await this.renameIfPresent(
-          fs,
-          `${this.filePath}.${index}`,
-          `${this.filePath}.${index + 1}`
-        );
-      }
-      await fs.rename(this.filePath, `${this.filePath}.1`);
-    } catch (error: unknown) {
-      console.error(
-        `${this.prefix} FlatFileErrorAdapter: could not rotate "${this.filePath}", so it will keep growing: ${describeError(error)}`
-      );
-    }
-  }
-
-  private async renameIfPresent(
-    fs: FileSystemLike,
-    from: string,
-    to: string
-  ): Promise<void> {
-    try {
-      await fs.rename(from, to);
-    } catch (error: unknown) {
-      if (!isMissingFileError(error)) {
-        throw error;
-      }
-    }
   }
 }

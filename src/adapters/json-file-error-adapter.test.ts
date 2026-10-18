@@ -22,6 +22,7 @@ class FakeFileSystem implements ReadWriteFileSystemLike {
   readonly files = new Map<string, string>();
   readonly directories: string[] = [];
   failWrite: Error | null = null;
+  failRename: Error | null = null;
 
   async appendFile(path: string, data: string): Promise<void> {
     if (this.failWrite !== null) {
@@ -54,6 +55,9 @@ class FakeFileSystem implements ReadWriteFileSystemLike {
   }
 
   async rename(from: string, to: string): Promise<void> {
+    if (this.failRename !== null) {
+      throw this.failRename;
+    }
     this.files.set(to, await this.readFile(from));
     this.files.delete(from);
   }
@@ -370,5 +374,196 @@ describe('JsonFileErrorAdapter with the real file system', () => {
     } finally {
       await realFs.rm(directory, { recursive: true, force: true });
     }
+  });
+});
+
+describe('JsonFileErrorAdapter ndjson rotation', () => {
+  /** Size of one stored line for a one-letter message (the id is a 36 character UUID). */
+  async function lineSize(): Promise<number> {
+    const fs = new FakeFileSystem();
+    await new JsonFileErrorAdapter('/l/e.ndjson', { fs }).log(entry('a'));
+    return (fs.files.get('/l/e.ndjson') ?? '').length;
+  }
+
+  const messagesIn = (fs: FakeFileSystem, path: string): string[] =>
+    (fs.files.get(path) ?? '')
+      .trim()
+      .split('\n')
+      .filter((line) => line !== '')
+      .map((line) => (JSON.parse(line) as JsonFileErrorRecord).message);
+
+  it('rotates when the next line would pass maxBytes, keeping whole lines in every file', async () => {
+    const fs = new FakeFileSystem();
+    const size = await lineSize();
+    const adapter = new JsonFileErrorAdapter('/l/e.ndjson', {
+      fs,
+      maxBytes: size * 2,
+      maxFiles: 3,
+    });
+
+    for (const message of ['a', 'b', 'c', 'd', 'e', 'f', 'g']) {
+      await adapter.log(entry(message));
+    }
+
+    expect(messagesIn(fs, '/l/e.ndjson')).toEqual(['g']);
+    expect(messagesIn(fs, '/l/e.ndjson.1')).toEqual(['e', 'f']);
+    expect(messagesIn(fs, '/l/e.ndjson.2')).toEqual(['c', 'd']);
+    expect(messagesIn(fs, '/l/e.ndjson.3')).toEqual(['a', 'b']);
+    expect(fs.files.has('/l/e.ndjson.4')).toBe(false);
+  });
+
+  it('drops the oldest rotated file once maxFiles is reached', async () => {
+    const fs = new FakeFileSystem();
+    const adapter = new JsonFileErrorAdapter('/l/e.ndjson', {
+      fs,
+      maxBytes: await lineSize(),
+      maxFiles: 1,
+    });
+    for (const message of ['a', 'b', 'c']) {
+      await adapter.log(entry(message));
+    }
+    expect(messagesIn(fs, '/l/e.ndjson')).toEqual(['c']);
+    expect(messagesIn(fs, '/l/e.ndjson.1')).toEqual(['b']);
+    expect(fs.files.has('/l/e.ndjson.2')).toBe(false);
+  });
+
+  it('keeps concurrent writes in order across a rotation', async () => {
+    const fs = new FakeFileSystem();
+    const adapter = new JsonFileErrorAdapter('/l/e.ndjson', {
+      fs,
+      maxBytes: (await lineSize()) * 2,
+      maxFiles: 5,
+    });
+    const names = ['a', 'b', 'c', 'd', 'e', 'f'];
+    await Promise.all(names.map((message) => adapter.log(entry(message))));
+    const all = [
+      ...messagesIn(fs, '/l/e.ndjson.3'),
+      ...messagesIn(fs, '/l/e.ndjson.2'),
+      ...messagesIn(fs, '/l/e.ndjson.1'),
+      ...messagesIn(fs, '/l/e.ndjson'),
+    ];
+    expect(all).toEqual(names);
+  });
+
+  it('does not rotate without maxBytes, or an empty or missing file', async () => {
+    const fs = new FakeFileSystem();
+    await new JsonFileErrorAdapter('/l/e.ndjson', { fs }).log(entry('a'));
+    await new JsonFileErrorAdapter('/l/e.ndjson', { fs }).log(entry('b'));
+    expect(fs.files.has('/l/e.ndjson.1')).toBe(false);
+
+    const small = new FakeFileSystem();
+    await new JsonFileErrorAdapter('/l/x.ndjson', {
+      fs: small,
+      maxBytes: 5,
+    }).log(entry('a very long message'));
+    expect(small.files.has('/l/x.ndjson.1')).toBe(false);
+    expect(messagesIn(small, '/l/x.ndjson')).toEqual(['a very long message']);
+  });
+
+  it('still writes the entry if rotation fails, and reports it', async () => {
+    const fs = new FakeFileSystem();
+    fs.failRename = new Error('EPERM: operation not permitted');
+    const spy = silenceConsole();
+    const adapter = new JsonFileErrorAdapter('/l/e.ndjson', {
+      fs,
+      maxBytes: await lineSize(),
+    });
+
+    await adapter.log(entry('a'));
+    const result = await adapter.log(entry('b'));
+
+    expect(result).toEqual({ ok: true });
+    expect(messagesIn(fs, '/l/e.ndjson')).toEqual(['a', 'b']);
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining('JsonFileErrorAdapter: could not rotate')
+    );
+    spy.mockRestore();
+  });
+
+  it('rotates files on disk', async () => {
+    const directory = await realFs.mkdtemp(
+      join(tmpdir(), 'error-log-adapter-')
+    );
+    try {
+      const folder = join(directory, 'logs');
+      const filePath = join(folder, 'errors.ndjson');
+      // Measure one line (one-letter messages are all the same size), then
+      // leave room for exactly two per file.
+      await new JsonFileErrorAdapter(join(directory, 'probe.ndjson')).log(
+        entry('a')
+      );
+      const size = (
+        await realFs.readFile(join(directory, 'probe.ndjson'), 'utf8')
+      ).length;
+      const maxBytes = size * 2;
+      const adapter = new JsonFileErrorAdapter(filePath, {
+        maxBytes,
+        maxFiles: 2,
+      });
+      for (const message of ['a', 'b', 'c', 'd', 'e', 'f', 'g']) {
+        expect(await adapter.log(entry(message))).toEqual({ ok: true });
+      }
+      const names = (await realFs.readdir(folder)).sort();
+      expect(names).toEqual([
+        'errors.ndjson',
+        'errors.ndjson.1',
+        'errors.ndjson.2',
+      ]);
+      const read = async (name: string) =>
+        (await realFs.readFile(join(folder, name), 'utf8'))
+          .trim()
+          .split('\n')
+          .map((line) => (JSON.parse(line) as JsonFileErrorRecord).message);
+      expect(await read('errors.ndjson')).toEqual(['g']);
+      expect(await read('errors.ndjson.1')).toEqual(['e', 'f']);
+      expect(await read('errors.ndjson.2')).toEqual(['c', 'd']);
+    } finally {
+      await realFs.rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it.each([0, -1, 1.5])('rejects maxBytes %s', (maxBytes) => {
+    expect(
+      () =>
+        new JsonFileErrorAdapter('/l/e.ndjson', {
+          fs: new FakeFileSystem(),
+          maxBytes,
+        })
+    ).toThrowError(/JsonFileErrorAdapter: maxBytes must be a positive integer/);
+  });
+
+  it('rejects an invalid maxFiles, and maxFiles without maxBytes', () => {
+    const fs = new FakeFileSystem();
+    expect(
+      () =>
+        new JsonFileErrorAdapter('/l/e.ndjson', {
+          fs,
+          maxBytes: 100,
+          maxFiles: 0,
+        })
+    ).toThrowError(/maxFiles must be a positive integer/);
+    expect(
+      () => new JsonFileErrorAdapter('/l/e.ndjson', { fs, maxFiles: 2 })
+    ).toThrowError(/maxFiles needs maxBytes/);
+  });
+
+  it('rejects maxBytes and maxFiles in array mode', () => {
+    const fs = new FakeFileSystem();
+    expect(
+      () =>
+        new JsonFileErrorAdapter('/l/e.json', {
+          fs,
+          mode: 'array',
+          maxBytes: 100,
+        })
+    ).toThrowError(/only apply to mode "ndjson".*use maxEntries/s);
+    expect(
+      () =>
+        new JsonFileErrorAdapter('/l/e.json', {
+          fs,
+          mode: 'array',
+          maxFiles: 2,
+        })
+    ).toThrowError(/only apply to mode "ndjson"/);
   });
 });
