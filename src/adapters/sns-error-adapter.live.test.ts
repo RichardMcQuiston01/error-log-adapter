@@ -182,6 +182,31 @@ describe.skipIf(!isConfigured)(
       expect(envelope?.MessageAttributes?.['source']?.Value).toBe('live-test');
     }, 90_000);
 
+    it('publishes a batch of entries, in more than one PublishBatch request', async () => {
+      const topicArn: string = await createTopic(`${namePrefix}-batch`, false);
+      const queueUrl: string = await subscribeQueue(
+        `${namePrefix}-batch`,
+        topicArn
+      );
+      const adapter = new SnsErrorAdapter(sns, topicArn);
+      const batch = Array.from({ length: 12 }, (_, index) => ({
+        code: 'LIVE_TEST',
+        message: `batched ${index}`,
+        source: 'live-test',
+      }));
+
+      const result = await adapter.logBatch(batch);
+
+      expect(result).toEqual({ ok: true });
+      const received = await receive(queueUrl, 12, 30);
+      expect(received).toHaveLength(12);
+      expect(
+        received.map((envelope) => JSON.parse(envelope.Message).message).sort()
+      ).toEqual(batch.map((entry) => entry.message).sort());
+      expect(received[0]?.MessageAttributes?.['code']?.Value).toBe('LIVE_TEST');
+      expect(received[0]?.Subject).toMatch(/^LIVE_TEST: batched \d+$/);
+    }, 90_000);
+
     it('lets a subscription filter policy pick entries by code', async () => {
       const topicArn: string = await createTopic(`${namePrefix}-filter`, false);
       const allQueue: string = await subscribeQueue(
