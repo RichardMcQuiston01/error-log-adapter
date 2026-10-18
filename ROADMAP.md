@@ -38,7 +38,6 @@ Nothing is queued. Candidates are under Cross-Cutting Work.
 ## Cross-Cutting Work
 
 - Let the SQLite adapter share the table name validation and DDL helpers that the MySQL / Postgres adapters now have.
-- Size-based rotation for the JSON file adapter's NDJSON mode (the flat file adapter already has it), ideally by sharing the rotation code.
 - Fill in README Getting Started, Usage, and Examples.
 - Add a CHANGELOG entry for each adapter release.
 - SNS publishing could follow the CloudWatch Logs adapter's injected-client pattern.
