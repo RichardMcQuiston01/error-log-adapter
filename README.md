@@ -70,26 +70,27 @@ Constructor options are checked when the adapter is created and throw a descript
 
 Every adapter takes an optional `prefix` (default `[error-log-adapter]`) that is printed before its failure messages.
 
-| Adapter                             | Sink                                                      | Runs in       | Main options                                                        |
-| ----------------------------------- | --------------------------------------------------------- | ------------- | ------------------------------------------------------------------- |
-| `ConsoleErrorAdapter`               | `console.error`                                           | Anywhere      |                                                                     |
-| `WebhookErrorAdapter(url)`          | HTTP `POST` of the entry as JSON                          | Anywhere      | `headers`, `timeoutMs`, `retries`, `signingSecret`, `allowInsecure` |
-| `MongoDbErrorAdapter(collection)`   | Anything with `insertOne`, such as a MongoDB `Collection` | Node          | `timeoutMs`                                                         |
-| `PostgresErrorAdapter(client)`      | A Postgres table, through `pg`                            | Node          | `tableName`, `createTable`, `timeoutMs`                             |
-| `MySqlErrorAdapter(client)`         | A MySQL / MariaDB table, through `mysql2/promise`         | Node          | `tableName`, `createTable`, `timeoutMs`                             |
-| `SqliteErrorAdapter(client)`        | A SQLite table, through any driver                        | Node, Bun     | `tableName`, `createTable`, `timeoutMs`                             |
-| `SupabaseErrorAdapter(client)`      | A Supabase table, through `supabase-js`                   | Anywhere      | `tableName`, `timeoutMs`                                            |
-| `RedisErrorAdapter(client)`         | A Redis list or stream                                    | Node          | `mode`, `key`, `maxEntries`, `side`, `timeoutMs`                    |
-| `S3ErrorAdapter(client, bucket)`    | S3, DigitalOcean Spaces, R2, MinIO objects                | Node          | `keyPrefix`, `batch`, `contentType`, `timeoutMs`                    |
-| `FirestoreErrorAdapter(collection)` | A Firestore collection                                    | Node, browser | `timeoutMs`                                                         |
-| `RealtimeDatabaseErrorAdapter(ref)` | A Realtime Database reference                             | Node, browser | `timeoutMs`                                                         |
-| `FlatFileErrorAdapter(path)`        | One text line per entry                                   | Node, Bun     | `formatLine`, `maxBytes`, `maxFiles`                                |
-| `JsonFileErrorAdapter(path)`        | NDJSON lines or one JSON array                            | Node, Bun     | `mode`, `maxEntries`, `indent`                                      |
-| `IndexedDbErrorAdapter(database)`   | An IndexedDB object store                                 | Browser       | `storeName`, `timeoutMs`                                            |
-| `WebStorageErrorAdapter(storage)`   | `sessionStorage` or `localStorage`, as one capped array   | Browser       | `key`, `maxEntries`, `locks`                                        |
-| `EventEmitterErrorAdapter(emitter)` | An event on an emitter you own (in-process hooks)         | Anywhere      | `eventName`, `requireListener`                                      |
-| `WebSocketErrorAdapter(socket)`     | One JSON message over a socket you own                    | Anywhere      | (none)                                                              |
-| `CompositeErrorAdapter([...])`      | Several adapters at once; succeeds only if all succeed    | Anywhere      | `timeoutMs`                                                         |
+| Adapter                                             | Sink                                                      | Runs in       | Main options                                                        |
+| --------------------------------------------------- | --------------------------------------------------------- | ------------- | ------------------------------------------------------------------- |
+| `ConsoleErrorAdapter`                               | `console.error`                                           | Anywhere      |                                                                     |
+| `WebhookErrorAdapter(url)`                          | HTTP `POST` of the entry as JSON                          | Anywhere      | `headers`, `timeoutMs`, `retries`, `signingSecret`, `allowInsecure` |
+| `MongoDbErrorAdapter(collection)`                   | Anything with `insertOne`, such as a MongoDB `Collection` | Node          | `timeoutMs`                                                         |
+| `PostgresErrorAdapter(client)`                      | A Postgres table, through `pg`                            | Node          | `tableName`, `createTable`, `timeoutMs`                             |
+| `MySqlErrorAdapter(client)`                         | A MySQL / MariaDB table, through `mysql2/promise`         | Node          | `tableName`, `createTable`, `timeoutMs`                             |
+| `SqliteErrorAdapter(client)`                        | A SQLite table, through any driver                        | Node, Bun     | `tableName`, `createTable`, `timeoutMs`                             |
+| `SupabaseErrorAdapter(client)`                      | A Supabase table, through `supabase-js`                   | Anywhere      | `tableName`, `timeoutMs`                                            |
+| `RedisErrorAdapter(client)`                         | A Redis list or stream                                    | Node          | `mode`, `key`, `maxEntries`, `side`, `timeoutMs`                    |
+| `S3ErrorAdapter(client, bucket)`                    | S3, DigitalOcean Spaces, R2, MinIO objects                | Node          | `keyPrefix`, `batch`, `contentType`, `timeoutMs`                    |
+| `FirestoreErrorAdapter(collection)`                 | A Firestore collection                                    | Node, browser | `timeoutMs`                                                         |
+| `RealtimeDatabaseErrorAdapter(ref)`                 | A Realtime Database reference                             | Node, browser | `timeoutMs`                                                         |
+| `FlatFileErrorAdapter(path)`                        | One text line per entry                                   | Node, Bun     | `formatLine`, `maxBytes`, `maxFiles`                                |
+| `JsonFileErrorAdapter(path)`                        | NDJSON lines or one JSON array                            | Node, Bun     | `mode`, `maxEntries`, `indent`                                      |
+| `IndexedDbErrorAdapter(database)`                   | An IndexedDB object store                                 | Browser       | `storeName`, `timeoutMs`                                            |
+| `WebStorageErrorAdapter(storage)`                   | `sessionStorage` or `localStorage`, as one capped array   | Browser       | `key`, `maxEntries`, `locks`                                        |
+| `EventEmitterErrorAdapter(emitter)`                 | An event on an emitter you own (in-process hooks)         | Anywhere      | `eventName`, `requireListener`                                      |
+| `WebSocketErrorAdapter(socket)`                     | One JSON message over a socket you own                    | Anywhere      | (none)                                                              |
+| `CloudWatchLogsErrorAdapter(client, group, stream)` | AWS CloudWatch Logs events                                | Node          | `batch`, `createMissing`, `timeoutMs`                               |
+| `CompositeErrorAdapter([...])`                      | Several adapters at once; succeeds only if all succeed    | Anywhere      | `timeoutMs`                                                         |
 
 Every stored record has the same shape: a UUID `id`, `code`, `message`, `timestamp` (ISO 8601), and optional `source` and `cause`. An `Error` cause is stored as `{ name, message, stack }`. `serializeEntry` and `serializeCause` are exported if you build your own sink.
 
@@ -103,6 +104,7 @@ What changes durability or size, by adapter:
 - **Browser storage**: `sessionStorage` belongs to one tab. `localStorage` is shared by every tab and has no atomic update, so two tabs logging at the same instant can overwrite each other's entry. `WebStorageErrorAdapter` takes a `navigator.locks` lock around each write, which reduces the loss but cannot remove it, since tabs in separate processes can still read a stale copy. Use `IndexedDbErrorAdapter` when every entry matters. Create its object store from your `onupgradeneeded` handler with `createErrorLogStore`. A stored value the adapter cannot read is copied to `<key>.corrupt` before it is replaced.
 - **Event emitter**: each entry is emitted as an `error-log` event whose payload is the stored record, for in-process hooks such as a toast, a metrics counter or a test assertion. Listeners run synchronously, so one that throws makes `log()` return `ok: false` with its message. Node's `EventEmitter` and mitt work as they are; a browser `EventTarget` needs a one-line wrapper (shown in the example below). Don't name the event `error` on a Node `EventEmitter`: it throws when nobody listens. Node's `emit` returns `false` when there are no listeners; pass `requireListener: true` to report that as a failure instead of letting the entry vanish.
 - **WebSocket**: each entry is sent as one JSON text message (the serialized entry plus its UUID `id`) over a socket you own; the adapter never connects, reconnects or buffers. If the socket's `readyState` is not open (connecting, closing or closed), `log()` returns `ok: false` and says which. `ok: true` means the socket accepted the message, not that the server got it, since a WebSocket has no acknowledgement. Browsers, Node's global `WebSocket`, Deno, Bun and `ws` all fit. Pair it with a durable adapter in a `CompositeErrorAdapter` if entries must survive the socket being down.
+- **CloudWatch Logs**: each entry is sent through `PutLogEvents` as a JSON event (the serialized entry plus its UUID `id`) stamped with the entry's time, so Logs Insights can query its fields. Pass an AWS SDK v3 `CloudWatchLogs` client. AWS no longer needs sequence tokens, so none are tracked. If the stream (or group) does not exist, the adapter creates it and tries again once (`createMissing`, on by default; it needs `logs:CreateLogStream` and `logs:CreateLogGroup`, and a group created this way never expires its logs, so set a retention policy). CloudWatch can answer ok and still refuse events older than 14 days or more than 2 hours ahead; that is reported as `ok: false`. An event over 256 KiB is refused before sending. With `batch: { batchSize, maxWaitMs }`, events are buffered and sent together (up to 10,000 events and 1 MiB per request, oldest first), `log()` returns `ok` as soon as the event is buffered, and you should call `flush()` before the process exits. In Lambda and ECS, stdout already reaches CloudWatch; this is for apps running elsewhere.
 - **Webhook**: the URL must be `https://` (or `http://localhost`, `127.0.0.1`, `[::1]`) unless you pass `allowInsecure: true`, because entries carry messages and stack traces. Redirects are not followed, since a redirect would turn the `POST` into a body-less `GET` or re-send the entry and your headers to another host; a redirect is reported as `ok: false`. Failure messages contain only the origin, never the path or query, because webhook URLs often hold a secret. Set `retries` to try again after a network error, a timeout, HTTP 408, 425, 429 or 5xx (exponential backoff with jitter from `retryDelayMs`, capped by `maxRetryDelayMs`, honoring `Retry-After`; other 4xx answers are never retried). With `retries` set, every attempt sends the same body including an `id`, so the receiver can drop a repeat. Set `signingSecret` to add `X-Signature-Timestamp` and `X-Signature-256` (`sha256=` + hex HMAC-SHA256 of `<timestamp>.<body>`); the receiver recomputes it and rejects old timestamps.
 
 ### When a sink is slow or down
@@ -136,6 +138,7 @@ Without an `id`, every call to `log()` gets a new random one, so logging twice s
 | IndexedDB, Web Storage, JSON file (`array` mode)     | Replaces the earlier record                                                                                     |
 | S3                                                   | Overwrites the same object only if the retry also has the same `timestamp` (the key contains both)              |
 | Webhook                                              | The `id` is added to the JSON body so the receiver can drop repeats                                             |
+| CloudWatch Logs                                      | Cannot detect a repeat (the `id` is in the message, so Logs Insights can `dedup id`)                            |
 | Redis, flat file, JSON file (`ndjson` mode), console | Cannot detect a repeat                                                                                          |
 
 `CompositeErrorAdapter` passes the entry through unchanged, so every sink sees the same `id`.
@@ -255,6 +258,21 @@ const errorLog = new CompositeErrorAdapter([
   new WebSocketErrorAdapter(socket),
   new FlatFileErrorAdapter('./errors.log'),
 ]);
+```
+
+Send errors to CloudWatch Logs from an app running outside AWS:
+
+```ts
+import { CloudWatchLogs } from '@aws-sdk/client-cloudwatch-logs';
+import { CloudWatchLogsErrorAdapter } from '@richardmcquiston01/error-log-adapter';
+
+const errorLog = new CloudWatchLogsErrorAdapter(
+  new CloudWatchLogs({ region: 'us-east-1' }),
+  '/my-app/errors',
+  `web-${process.pid}`,
+  { batch: { batchSize: 100, maxWaitMs: 5000 } }
+);
+process.on('beforeExit', () => void errorLog.flush());
 ```
 
 Write your own adapter by implementing the interface. Catch failures and return them rather than throwing:

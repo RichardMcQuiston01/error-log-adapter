@@ -28,6 +28,7 @@ Planned adapters, in priority order.
 - Supabase: through `supabase-js` (for a direct connection, use the Postgres adapter)
 - Event emitter: each entry as an event on Node `EventEmitter`, mitt, or an `EventTarget` wrapper
 - WebSocket: JSON entries over a caller-owned socket (anything with `send` and `readyState`); fails descriptively when the socket is not open
+- AWS CloudWatch Logs: `PutLogEvents` through an injected client, one group/stream per adapter, optional batching within the request limits
 
 ## Next Up
 
@@ -37,13 +38,6 @@ Retry with backoff, the request timeout and the HMAC signature header are shippe
 
 - Optional batching of entries into one request (needs a flush story, since `log()` resolves per entry; likely shares the cross-cutting batching wrapper below).
 
-### 2. AWS CloudWatch Logs
-
-- Use `PutLogEvents` through an injected client.
-- Worth it for apps running outside managed AWS runtimes (Lambda and ECS already ship stdout to CloudWatch).
-- Scope: one log group/stream per adapter instance; handle sequence tokens and the batch size limit.
-- SNS publishing could share the same client pattern later.
-
 ## Cross-Cutting Work
 
 - Optional retention for the Firebase adapters: a `Date` field Firestore can apply a TTL policy to, so old log documents expire on their own.
@@ -52,4 +46,5 @@ Retry with backoff, the request timeout and the HMAC signature header are shippe
 - Fill in README Getting Started, Usage, and Examples.
 - Document how to write a custom adapter.
 - Add a CHANGELOG entry for each adapter release.
+- SNS publishing could follow the CloudWatch Logs adapter's injected-client pattern.
 - Consider a shared batching/retry wrapper adapter that can sit in front of any sink.
