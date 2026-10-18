@@ -322,6 +322,8 @@ class SlackErrorAdapter implements ErrorLogAdapter {
 }
 ```
 
+The full guide, [docs/custom-adapters.md](./docs/custom-adapters.md), covers the contract, timeouts, entry ids, buffering adapters, testing, and a checklist.
+
 See [ROADMAP.md](./ROADMAP.md) for planned adapters and [CHANGELOG.md](./CHANGELOG.md) for what changed in each release.
 
 ### Development
