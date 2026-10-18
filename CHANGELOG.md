@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 0.13.0
+
+### Added
+
+- `SnsErrorAdapter(client, topicArn)` publishes each entry to an Amazon SNS topic as a JSON message (the serialized entry plus its UUID `id`) through an injected client (`publish`; the AWS SDK v3 `SNS` client fits as it is). The entry's `code` and `source` are sent as message attributes so subscription filter policies can route on them (`attributes: false` turns it off), and the subject is `<code>: <message>` cut to what SNS accepts (`subject: false` leaves it out). FIFO topics need `messageGroupId` and use the entry's `id` as the deduplication id. A message over 256 KiB, attributes included, is refused before sending, and the topic ARN is checked in the constructor. Exports `SnsClientLike`, `SnsErrorOptions`, `SnsMessageAttribute` and `SnsPublishInput`.
+- Opt-in live tests for the CloudWatch Logs adapter (group and stream creation, batching, the too-old rejection, a missing group) and the Firestore adapter (documents keyed by id, the `expire_at` timestamp field, a custom `expireField`, same-id overwrite). They are skipped unless `CLOUDWATCH_TEST_REGION` or `FIRESTORE_TEST_PROJECT_ID` is set, and run with `npm run test:live`, which now runs every `*.live.test.ts` file. Dev-only; nothing changes in the published package.
+
 ## 0.12.0
 
 ### Changed
