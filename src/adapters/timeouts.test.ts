@@ -12,6 +12,7 @@ import {
 } from './sql-error-adapter.js';
 import { RedisErrorAdapter } from './redis-error-adapter.js';
 import { S3ErrorAdapter } from './s3-error-adapter.js';
+import { SnsErrorAdapter } from './sns-error-adapter.js';
 import { SqliteErrorAdapter } from './sqlite-error-adapter.js';
 import { SupabaseErrorAdapter } from './supabase-error-adapter.js';
 
@@ -20,6 +21,8 @@ const ENTRY: ErrorLogEntry = {
   message: 'm',
   timestamp: '2026-01-02T03:04:05.678Z',
 };
+
+const SNS_TOPIC = 'arn:aws:sns:us-east-1:123456789012:app-errors';
 
 const neverSettles = (): Promise<never> => new Promise<never>(() => {});
 
@@ -82,6 +85,18 @@ const CASES: Case[] = [
       }),
     buildRaw: (t) =>
       new S3ErrorAdapter({ putObject: neverSettles }, 'bucket', {
+        timeoutMs: t,
+      }),
+  },
+  {
+    name: 'SnsErrorAdapter',
+    sink: 'SNS',
+    build: (t) =>
+      new SnsErrorAdapter({ publish: neverSettles }, SNS_TOPIC, {
+        timeoutMs: t,
+      }),
+    buildRaw: (t) =>
+      new SnsErrorAdapter({ publish: neverSettles }, SNS_TOPIC, {
         timeoutMs: t,
       }),
   },

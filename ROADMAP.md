@@ -29,6 +29,7 @@ Planned adapters, in priority order.
 - Event emitter: each entry as an event on Node `EventEmitter`, mitt, or an `EventTarget` wrapper
 - WebSocket: JSON entries over a caller-owned socket (anything with `send` and `readyState`); fails descriptively when the socket is not open
 - AWS CloudWatch Logs: `PutLogEvents` through an injected client, one group/stream per adapter, optional batching within the request limits
+- AWS SNS: `Publish` through an injected client, `code` and `source` as filterable message attributes, FIFO topics with deduplication by entry id
 - Batching wrapper: `BatchingErrorAdapter` queues, batches and retries in front of any adapter; the webhook adds `logBatch` (one request, JSON array)
 
 ## Next Up
@@ -39,4 +40,3 @@ Nothing is queued. Candidates are under Cross-Cutting Work.
 
 - Fill in README Getting Started, Usage, and Examples.
 - Add a CHANGELOG entry for each adapter release.
-- SNS publishing could follow the CloudWatch Logs adapter's injected-client pattern.
