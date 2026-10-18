@@ -559,4 +559,75 @@ describe('WebhookErrorAdapter', () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
   });
+
+  describe('logBatch', () => {
+    const URL_ = 'https://example.com/errors';
+
+    it('sends one request with a JSON array of records that each have an id', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+      vi.stubGlobal('fetch', mockFetch);
+
+      const result = await new WebhookErrorAdapter(URL_).logBatch([
+        ENTRY,
+        {
+          ...ENTRY,
+          message: 'second',
+          id: '3f2b8c1e-5d4a-4e7b-9a10-2c6d8e0f1a2b',
+        },
+      ]);
+
+      expect(result).toEqual({ ok: true });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+      const body = JSON.parse(init.body as string);
+      expect(body).toHaveLength(2);
+      expect(body[0].id).toMatch(/^[0-9a-f-]{36}$/);
+      expect(body[0]).toMatchObject({
+        code: 'ADAPTER_ERROR',
+        message: 'something went wrong',
+      });
+      expect(body[1]).toMatchObject({
+        message: 'second',
+        id: '3f2b8c1e-5d4a-4e7b-9a10-2c6d8e0f1a2b',
+      });
+    });
+
+    it('sends nothing for an empty batch', async () => {
+      const mockFetch = vi.fn();
+      vi.stubGlobal('fetch', mockFetch);
+      expect(await new WebhookErrorAdapter(URL_).logBatch([])).toEqual({
+        ok: true,
+      });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('reports a failure, and an invalid id, without throwing', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn()
+          .mockResolvedValue({ ok: false, status: 500, headers: new Headers() })
+      );
+      const adapter = new WebhookErrorAdapter(URL_);
+      expect((await adapter.logBatch([ENTRY])).error).toContain('HTTP 500');
+      const bad = await adapter.logBatch([{ ...ENTRY, id: 'nope' }]);
+      expect(bad.ok).toBe(false);
+      expect(bad.error).toContain('could not prepare the entries');
+    });
+
+    it('signs the array body', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+      vi.stubGlobal('fetch', mockFetch);
+      await new WebhookErrorAdapter(URL_, { signingSecret: 'k' }).logBatch([
+        ENTRY,
+      ]);
+      const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+      const headers = init.headers as Record<string, string>;
+      const expected = createHmac('sha256', 'k')
+        .update(`${headers['X-Signature-Timestamp']}.${init.body as string}`)
+        .digest('hex');
+      expect(headers['X-Signature-256']).toBe(`sha256=${expected}`);
+    });
+  });
 });
