@@ -1,13 +1,7 @@
-import { DEFAULT_PREFIX, reportFailure } from '../fail.js';
 import { DEFAULT_TABLE_NAME, assertIdentifier } from '../sql-ident.js';
-import { resolveEntryId } from '../entry-id.js';
-import { resolveTimeoutMs, timeoutMessage, withTimeout } from '../timeout.js';
-import { serializeEntry } from '../serialize.js';
-import type {
-  ErrorLogAdapter,
-  ErrorLogEntry,
-  ErrorLogResult,
-} from '../types.js';
+import { SqlTableAdapter } from '../sql-table-adapter.js';
+import type { SqlTableOptions } from '../sql-table-adapter.js';
+import type { SerializedErrorLogEntry } from '../serialize.js';
 
 /**
  * Longest allowed table name. The index name adds `_occurred_at_idx` (16
@@ -26,19 +20,9 @@ export interface SqlClientLike {
   query(sql: string, params: unknown[]): Promise<unknown>;
 }
 
-export interface SqlErrorOptions {
+export interface SqlErrorOptions extends SqlTableOptions {
   /** Table to write to. Defaults to `error_log`. Letters, digits and `_` only, up to 47 characters. */
   tableName?: string;
-  /** Create the table (and index) on first use. Defaults to `true`. */
-  createTable?: boolean;
-  /** Text printed before failure messages. Defaults to `[error-log-adapter]`. */
-  prefix?: string;
-  /**
-   * How long `log` waits for each database statement before giving up, in milliseconds. Defaults
-   * to 10000. Pass `Infinity` to wait without limit. The call cannot be
-   * cancelled, so it may still finish after `log` has returned a failure.
-   */
-  timeoutMs?: number;
 }
 
 /** Throws a descriptive error unless `tableName` is a short, plain SQL identifier. */
@@ -119,61 +103,34 @@ function toMysqlDateTime(date: Date): string {
 /** Shared by the Postgres and MySQL adapters: only the SQL text and time format differ. */
 abstract class SqlErrorAdapter<
   TCode extends string = string,
-> implements ErrorLogAdapter<TCode> {
-  private readonly tableName: string;
-  private readonly createTable: boolean;
-  private readonly prefix: string;
-  private readonly timeoutMs: number;
-  private tableReady: Promise<void> | null = null;
-
+> extends SqlTableAdapter<TCode> {
   protected constructor(
     private readonly client: SqlClientLike,
     private readonly dialect: SqlDialect,
-    private readonly adapterName: string,
+    adapterName: string,
     options: SqlErrorOptions
   ) {
-    this.tableName = options.tableName ?? DEFAULT_TABLE_NAME;
-    assertValidTableName(this.tableName, adapterName);
-    this.createTable = options.createTable ?? true;
-    this.prefix = options.prefix ?? DEFAULT_PREFIX;
-    this.timeoutMs = resolveTimeoutMs(options.timeoutMs, adapterName);
+    super(
+      adapterName,
+      dialect === 'postgres' ? 'Postgres' : 'MySQL',
+      options,
+      MAX_TABLE_NAME_LENGTH
+    );
   }
 
-  async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
-    try {
-      const serialized = serializeEntry(entry);
-      const occurredAt: Date = new Date(serialized.timestamp);
-      if (Number.isNaN(occurredAt.getTime())) {
-        throw new RangeError(
-          `timestamp "${serialized.timestamp}" is not a valid ISO 8601 date`
-        );
-      }
-      const params: unknown[] = [
-        resolveEntryId(entry),
-        serialized.code,
-        serialized.message,
-        serialized.cause === undefined
-          ? null
-          : JSON.stringify(serialized.cause),
-        serialized.source ?? null,
-        this.dialect === 'postgres'
-          ? occurredAt.toISOString()
-          : toMysqlDateTime(occurredAt),
-      ];
-      await this.ensureTable();
-      await this.query(this.insertSql(), params);
-      return { ok: true };
-    } catch (error: unknown) {
-      return reportFailure({
-        adapterName: this.adapterName,
-        prefix: this.prefix,
-        action: `to write to table "${this.tableName}"`,
-        error,
-      });
+  protected occurredAtParam(entry: SerializedErrorLogEntry): string {
+    const occurredAt: Date = new Date(entry.timestamp);
+    if (Number.isNaN(occurredAt.getTime())) {
+      throw new RangeError(
+        `timestamp "${entry.timestamp}" is not a valid ISO 8601 date`
+      );
     }
+    return this.dialect === 'postgres'
+      ? occurredAt.toISOString()
+      : toMysqlDateTime(occurredAt);
   }
 
-  private insertSql(): string {
+  protected insertSql(): string {
     const placeholders: string =
       this.dialect === 'postgres'
         ? '$1, $2, $3, $4, $5, $6'
@@ -186,38 +143,12 @@ abstract class SqlErrorAdapter<
     return `INSERT INTO ${quoteIdentifier(this.dialect, this.tableName)} (id, code, message, cause, source, occurred_at) VALUES (${placeholders}) ${onRepeat}`;
   }
 
-  /** Creates the table once. A failed attempt is retried on the next log call. */
-  private ensureTable(): Promise<void> {
-    if (!this.createTable) {
-      return Promise.resolve();
-    }
-    if (this.tableReady === null) {
-      this.tableReady = this.runCreateStatements().catch(
-        (error: unknown): never => {
-          this.tableReady = null;
-          throw error;
-        }
-      );
-    }
-    return this.tableReady;
+  protected createStatements(): string[] {
+    return buildErrorLogTableDdl(this.dialect, this.tableName);
   }
 
-  private async runCreateStatements(): Promise<void> {
-    for (const sql of buildErrorLogTableDdl(this.dialect, this.tableName)) {
-      await this.query(sql, []);
-    }
-  }
-
-  /** Runs one statement, giving up waiting after `timeoutMs`. */
-  private query(sql: string, params: unknown[]): Promise<unknown> {
-    return withTimeout(
-      (): Promise<unknown> => this.client.query(sql, params),
-      this.timeoutMs,
-      timeoutMessage(
-        this.dialect === 'postgres' ? 'Postgres' : 'MySQL',
-        this.timeoutMs
-      )
-    );
+  protected callDriver(sql: string, params: unknown[]): Promise<unknown> {
+    return this.client.query(sql, params);
   }
 }
 

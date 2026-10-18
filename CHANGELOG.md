@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.12.0
+
+### Changed
+
+- The Postgres, MySQL and SQLite adapters now share one base class (`SqlTableAdapter`, internal): the `error_log` row, creating the table once and retrying after a failure, the keep-the-first-row insert, and the `timeoutMs` handling were written out three times and now live in one place. Each adapter keeps its own SQL, so the DDL, the `INSERT` text, the stored values and the public exports are unchanged. One small difference: `SqliteErrorAdapter` now checks the entry (for example an invalid `id`) before it creates the table, as the Postgres and MySQL adapters already did, so a bad entry no longer creates an empty table as a side effect.
+
 ## 0.11.0
 
 ### Added
