@@ -1,15 +1,10 @@
 # CHANGELOG
 
-## Unreleased
+## 0.14.0
 
 ### Added
 
 - `SnsErrorAdapter.logBatch(entries)` publishes several entries with `PublishBatch` (up to 10 messages and 256 KiB per request, split automatically), so `BatchingErrorAdapter` now delivers a batch in a few requests instead of one per entry. Every entry is checked before anything is sent; after that the call stops at the first failing request (including messages SNS refuses inside an accepted request) and reports how many entries were already published. `SnsClientLike` gains an optional `publishBatch`; a client without it still works, with the entries published one by one. Exports `SnsPublishBatchEntry` and `SnsPublishBatchInput`.
-
-## Unreleased
-
-### Added
-
 - Opt-in live test for the SNS adapter: it creates topics and SQS queues, publishes through `SnsErrorAdapter`, and reads the messages back (the JSON message, subject and `code` / `source` attributes, a subscription filter policy picking entries by code, FIFO deduplication by entry id, and a missing topic). Skipped unless `SNS_TEST_REGION` is set; run with `npm run test:live`. Dev-only (adds `@aws-sdk/client-sns` and `@aws-sdk/client-sqs` as dev dependencies); nothing changes in the published package.
 
 ## 0.13.0
