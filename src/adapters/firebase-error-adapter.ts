@@ -41,8 +41,18 @@ export interface FirebaseErrorRecord {
  * ```
  */
 export interface FirestoreCollectionLike {
-  doc(documentId: string): { set(data: FirebaseErrorRecord): Promise<unknown> };
+  doc(documentId: string): {
+    set(data: FirestoreErrorRecord): Promise<unknown>;
+  };
 }
+
+/**
+ * What the Firestore adapter writes: the usual fields, plus the expiry field
+ * (a `Date`, which Firestore stores as a timestamp) when `expireAfterMs` is set.
+ */
+export type FirestoreErrorRecord = FirebaseErrorRecord & {
+  [field: string]: unknown;
+};
 
 /**
  * The only thing the Realtime Database adapter needs from a reference:
@@ -85,6 +95,38 @@ export interface FirebaseErrorOptions {
   timeoutMs?: number;
   /** Text printed before failure messages. Defaults to `[error-log-adapter]`. */
   prefix?: string;
+}
+
+/** Default name of the field that holds a document's expiry time. */
+export const DEFAULT_EXPIRE_FIELD = 'expire_at';
+
+const RESERVED_FIELDS: ReadonlySet<string> = new Set([
+  'id',
+  'code',
+  'message',
+  'timestamp',
+  'source',
+  'cause',
+]);
+
+export interface FirestoreErrorOptions extends FirebaseErrorOptions {
+  /**
+   * Add an expiry time to every document: the entry's `timestamp` plus this
+   * many milliseconds, stored as a Firestore timestamp in `expireField`. This
+   * only writes the field. Firestore deletes nothing until you turn on a TTL
+   * policy for that field, for example:
+   *
+   * ```sh
+   * gcloud firestore fields ttls update expire_at \
+   *   --collection-group=error_log --enable-ttl
+   * ```
+   *
+   * Firestore then removes documents some time after they expire (typically
+   * within a day), and the deletes are billed like any other. Off by default.
+   */
+  expireAfterMs?: number;
+  /** Name of the expiry field. Defaults to `expire_at`. Only used with `expireAfterMs`. */
+  expireField?: string;
 }
 
 /** Waits for the write, but rejects with a descriptive error if it takes longer than `timeoutMs`. */
@@ -131,22 +173,52 @@ export class FirestoreErrorAdapter<
 > implements ErrorLogAdapter<TCode> {
   private readonly prefix: string;
   private readonly timeoutMs: number;
+  private readonly expireAfterMs: number | undefined;
+  private readonly expireField: string;
 
-  /** @throws {RangeError} if `options.timeoutMs` is not a positive number or `Infinity`. */
+  /** @throws {RangeError} if `options.timeoutMs` is not a positive number or `Infinity`, or the expiry options are invalid. */
   constructor(
     private readonly collection: FirestoreCollectionLike,
-    options: FirebaseErrorOptions = {}
+    options: FirestoreErrorOptions = {}
   ) {
     this.prefix = options.prefix ?? DEFAULT_PREFIX;
     this.timeoutMs = resolveTimeoutMs(
       options.timeoutMs,
       'FirestoreErrorAdapter'
     );
+    this.expireAfterMs = options.expireAfterMs;
+    this.expireField = options.expireField ?? DEFAULT_EXPIRE_FIELD;
+    if (
+      this.expireAfterMs !== undefined &&
+      (!Number.isFinite(this.expireAfterMs) || this.expireAfterMs <= 0)
+    ) {
+      throw new RangeError(
+        `FirestoreErrorAdapter: expireAfterMs must be a positive number of milliseconds, received ${String(options.expireAfterMs)}.`
+      );
+    }
+    if (
+      this.expireField === '' ||
+      /[./]/.test(this.expireField) ||
+      RESERVED_FIELDS.has(this.expireField)
+    ) {
+      throw new RangeError(
+        `FirestoreErrorAdapter: expireField must be a name other than ${[...RESERVED_FIELDS].join(', ')}, without "." or "/", received ${JSON.stringify(this.expireField)}.`
+      );
+    }
   }
 
   async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
     try {
-      const record: FirebaseErrorRecord = buildRecord(entry);
+      const record: FirestoreErrorRecord = { ...buildRecord(entry) };
+      if (this.expireAfterMs !== undefined) {
+        const occurredAt: number = Date.parse(record.timestamp);
+        if (Number.isNaN(occurredAt)) {
+          throw new RangeError(
+            `timestamp "${record.timestamp}" is not a valid ISO 8601 date, so the expiry time cannot be worked out`
+          );
+        }
+        record[this.expireField] = new Date(occurredAt + this.expireAfterMs);
+      }
       await waitForWrite(
         () => this.collection.doc(record.id).set(record),
         this.timeoutMs
