@@ -335,7 +335,16 @@ bun run lint        # Prettier check
 bun run typecheck
 bun run test
 bun run build
+bun run test:live   # opt-in tests against real services, see below
 ```
+
+`bun run test:live` runs the `*.live.test.ts` files, which are skipped unless their environment variables are set (`bun run test` and CI never touch a real service). Each file starts with a comment that lists its variables and the permissions it needs, and cleans up what it creates:
+
+| Adapter         | Set to enable                     | Runs against                                             |
+| --------------- | --------------------------------- | -------------------------------------------------------- |
+| S3              | `S3_TEST_BUCKET` (and a key pair) | an S3-compatible bucket                                  |
+| CloudWatch Logs | `CLOUDWATCH_TEST_REGION`          | CloudWatch Logs, or LocalStack via an endpoint           |
+| Firestore       | `FIRESTORE_TEST_PROJECT_ID`       | Firestore, or the emulator via `FIRESTORE_EMULATOR_HOST` |
 
 Releases are published to npm by the `Publish` GitHub Action when a GitHub release is created. The release tag must match the version in `package.json` (for example `v0.1.0`).
 
