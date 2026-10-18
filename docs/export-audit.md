@@ -17,7 +17,7 @@ This is a proposal. Nothing is removed or relabeled until it is approved.
 
 ## What the evidence shows
 
-- **All of 0.1.0 to 0.13.0 shipped between 2026-10-14 and 2026-10-18.** Thirteen tags in five days. No adapter has had time in other people's hands, so the rule above rests on tests, not on soak time.
+- **All of 0.1.0 to 0.14.0 shipped between 2026-10-14 and 2026-10-18.** Fourteen tags in five days. No adapter has had time in other people's hands, so the rule above rests on tests, not on soak time.
 - **The contract has barely changed.** Since 0.1.0 the only change to `ErrorLogEntry`, `ErrorLogResult` and `ErrorLogAdapter` is the optional `id` field. That makes the 1.0 contract safe to freeze.
 - **CI never touches a real service.** The CI workflow runs lint, type checks, unit tests and the build, on Linux and on Windows. The four opt-in live tests (CloudWatch Logs, Firestore, S3, SNS) are run by hand with credentials. They also matter for rule 2: they pass the real SDK client straight into the adapter, so the type check in CI compiles that fit.
 - **Most adapters have only fakes.** See the tiers below.
@@ -71,7 +71,7 @@ This is a proposal. Nothing is removed or relabeled until it is approved.
 
 ## Findings
 
-1. **The contract is ready to freeze.** One optional field in thirteen releases.
+1. **The contract is ready to freeze.** One optional field in fourteen releases.
 2. **The Stable list holds 12 adapters, and nine are Experimental.** The Experimental list is mostly a gap in tests, not in code, and it can be closed without credentials.
 3. **One helper to remove:** `formatErrorLogLine`.
 4. **Missing for 1.0:** a versioning and support policy, a `SECURITY.md`, and a `CLAUDE.md`. The ROADMAP still lists "fill in README Getting Started, Usage, and Examples" as to do, but the README has all three sections (about 390 lines), so that line looks stale. I did not compare the README with every adapter.
