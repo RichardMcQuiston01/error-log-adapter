@@ -360,6 +360,7 @@ bun run test:live   # opt-in tests against real services, see below
 | --------------- | --------------------------------- | -------------------------------------------------------- |
 | S3              | `S3_TEST_BUCKET` (and a key pair) | an S3-compatible bucket                                  |
 | CloudWatch Logs | `CLOUDWATCH_TEST_REGION`          | CloudWatch Logs, or LocalStack via an endpoint           |
+| SNS             | `SNS_TEST_REGION`                 | SNS and SQS, or LocalStack / moto via an endpoint        |
 | Firestore       | `FIRESTORE_TEST_PROJECT_ID`       | Firestore, or the emulator via `FIRESTORE_EMULATOR_HOST` |
 
 Releases are published to npm by the `Publish` GitHub Action when a GitHub release is created. The release tag must match the version in `package.json` (for example `v0.1.0`).

@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### Added
+
+- Opt-in live test for the SNS adapter: it creates topics and SQS queues, publishes through `SnsErrorAdapter`, and reads the messages back (the JSON message, subject and `code` / `source` attributes, a subscription filter policy picking entries by code, FIFO deduplication by entry id, and a missing topic). Skipped unless `SNS_TEST_REGION` is set; run with `npm run test:live`. Dev-only (adds `@aws-sdk/client-sns` and `@aws-sdk/client-sqs` as dev dependencies); nothing changes in the published package.
+
 ## 0.13.0
 
 ### Added
