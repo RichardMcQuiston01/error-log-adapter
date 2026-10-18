@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.8.0
+
+### Added
+
+- `CloudWatchLogsErrorAdapter` sends each entry to one AWS CloudWatch Logs stream through `PutLogEvents`, as a JSON event (the serialized entry plus its UUID `id`) stamped with the entry's time. It takes an AWS SDK v3 `CloudWatchLogs` client, so there is no new dependency. It creates a missing stream or group and tries again (`createMissing`, on by default), reports events CloudWatch accepts the request for but rejects (too old or too new) as `ok: false`, and refuses an event over the 256 KiB limit before sending. Optional `batch` buffers events and sends them oldest first within the 10,000 event, 1 MiB and 24 hour limits of one request; call `flush()` before exiting. Also takes `timeoutMs`.
+
 ## 0.7.0
 
 ### Added

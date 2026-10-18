@@ -111,3 +111,11 @@ export type {
   WebSocketErrorOptions,
   WebSocketLike,
 } from './adapters/websocket-error-adapter.js';
+export { CloudWatchLogsErrorAdapter } from './adapters/cloudwatch-logs-error-adapter.js';
+export type {
+  CloudWatchBatchOptions,
+  CloudWatchLogEvent,
+  CloudWatchLogsClientLike,
+  CloudWatchLogsErrorOptions,
+  CloudWatchPutLogEventsInput,
+} from './adapters/cloudwatch-logs-error-adapter.js';
