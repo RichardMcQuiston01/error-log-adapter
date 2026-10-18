@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### Added
+
+- Opt-in live tests for the CloudWatch Logs adapter (group and stream creation, batching, the too-old rejection, a missing group) and the Firestore adapter (documents keyed by id, the `expire_at` timestamp field, a custom `expireField`, same-id overwrite). They are skipped unless `CLOUDWATCH_TEST_REGION` or `FIRESTORE_TEST_PROJECT_ID` is set, and run with `npm run test:live`, which now runs every `*.live.test.ts` file. Dev-only; nothing changes in the published package.
+
 ## 0.12.0
 
 ### Changed
