@@ -1,13 +1,7 @@
-import { DEFAULT_PREFIX, reportFailure } from '../fail.js';
 import { DEFAULT_TABLE_NAME, assertIdentifier } from '../sql-ident.js';
-import { resolveEntryId } from '../entry-id.js';
-import { resolveTimeoutMs, timeoutMessage, withTimeout } from '../timeout.js';
-import { serializeEntry } from '../serialize.js';
-import type {
-  ErrorLogAdapter,
-  ErrorLogEntry,
-  ErrorLogResult,
-} from '../types.js';
+import { SqlTableAdapter } from '../sql-table-adapter.js';
+import type { SqlTableOptions } from '../sql-table-adapter.js';
+import type { SerializedErrorLogEntry } from '../serialize.js';
 
 /**
  * The only thing this adapter needs from a SQLite driver: run one statement
@@ -25,19 +19,9 @@ export interface SqliteClientLike {
   run(sql: string, params: unknown[]): unknown;
 }
 
-export interface SqliteErrorOptions {
+export interface SqliteErrorOptions extends SqlTableOptions {
   /** Table to write to. Defaults to `error_log`. Letters, digits and `_` only. */
   tableName?: string;
-  /** Create the table (and index) on first use. Defaults to `true`. */
-  createTable?: boolean;
-  /** Text printed before failure messages. Defaults to `[error-log-adapter]`. */
-  prefix?: string;
-  /**
-   * How long `log` waits for the driver before giving up, in milliseconds. Defaults
-   * to 10000. Pass `Infinity` to wait without limit. The call cannot be
-   * cancelled, so it may still finish after `log` has returned a failure.
-   */
-  timeoutMs?: number;
 }
 
 /** Throws a descriptive error unless `tableName` is a plain SQL identifier. */
@@ -69,81 +53,28 @@ export function buildCreateErrorLogTableSql(
 
 export class SqliteErrorAdapter<
   TCode extends string = string,
-> implements ErrorLogAdapter<TCode> {
-  private readonly tableName: string;
-  private readonly createTable: boolean;
-  private readonly prefix: string;
-  private readonly timeoutMs: number;
-  private tableReady: Promise<void> | null = null;
-
+> extends SqlTableAdapter<TCode> {
   /** @throws {RangeError} if `options.tableName` is not a plain identifier or `options.timeoutMs` is invalid. */
   constructor(
     private readonly client: SqliteClientLike,
     options: SqliteErrorOptions = {}
   ) {
-    this.tableName = options.tableName ?? DEFAULT_TABLE_NAME;
-    assertValidTableName(this.tableName);
-    this.createTable = options.createTable ?? true;
-    this.prefix = options.prefix ?? DEFAULT_PREFIX;
-    this.timeoutMs = resolveTimeoutMs(options.timeoutMs, 'SqliteErrorAdapter');
+    super('SqliteErrorAdapter', 'SQLite', options);
   }
 
-  async log(entry: ErrorLogEntry<TCode>): Promise<ErrorLogResult> {
-    try {
-      await this.ensureTable();
-      const serialized = serializeEntry(entry);
-      await this.run(
-        `INSERT INTO ${this.tableName} (id, code, message, cause, source, occurred_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO NOTHING`,
-        [
-          resolveEntryId(entry),
-          serialized.code,
-          serialized.message,
-          serialized.cause === undefined
-            ? null
-            : JSON.stringify(serialized.cause),
-          serialized.source ?? null,
-          serialized.timestamp,
-        ]
-      );
-      return { ok: true };
-    } catch (error: unknown) {
-      return reportFailure({
-        adapterName: 'SqliteErrorAdapter',
-        prefix: this.prefix,
-        action: `to write to table "${this.tableName}"`,
-        error,
-      });
-    }
+  protected occurredAtParam(entry: SerializedErrorLogEntry): string {
+    return entry.timestamp;
   }
 
-  /** Creates the table once. A failed attempt is retried on the next log call. */
-  private ensureTable(): Promise<void> {
-    if (!this.createTable) {
-      return Promise.resolve();
-    }
-    if (this.tableReady === null) {
-      this.tableReady = this.runCreateStatements().catch(
-        (error: unknown): never => {
-          this.tableReady = null;
-          throw error;
-        }
-      );
-    }
-    return this.tableReady;
+  protected insertSql(): string {
+    return `INSERT INTO ${this.tableName} (id, code, message, cause, source, occurred_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO NOTHING`;
   }
 
-  private async runCreateStatements(): Promise<void> {
-    for (const sql of buildCreateErrorLogTableSql(this.tableName)) {
-      await this.run(sql, []);
-    }
+  protected createStatements(): string[] {
+    return buildCreateErrorLogTableSql(this.tableName);
   }
 
-  /** Runs one statement, giving up waiting after `timeoutMs`. */
-  private run(sql: string, params: unknown[]): Promise<unknown> {
-    return withTimeout(
-      (): unknown => this.client.run(sql, params),
-      this.timeoutMs,
-      timeoutMessage('SQLite', this.timeoutMs)
-    );
+  protected callDriver(sql: string, params: unknown[]): unknown {
+    return this.client.run(sql, params);
   }
 }

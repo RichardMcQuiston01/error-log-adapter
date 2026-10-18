@@ -44,6 +44,21 @@ describe('SqliteErrorAdapter', () => {
     ]);
   });
 
+  it('reports an invalid entry id before touching the database', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const run = vi.fn<[string, unknown[]], unknown>();
+
+    const result = await new SqliteErrorAdapter({ run }).log({
+      ...ENTRY,
+      id: 'nope',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('entry.id must be a UUID');
+    expect(run).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
   it('stores null for a missing cause and source', async () => {
     const run = vi.fn<[string, unknown[]], unknown>();
 
