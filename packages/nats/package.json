@@ -1,0 +1,55 @@
+{
+  "name": "@richardmcquiston01/error-log-adapter-nats",
+  "version": "0.1.0",
+  "description": "NATS and NATS JetStream adapter for @richardmcquiston01/error-log-adapter: publishes each error as a JSON message to a subject.",
+  "license": "Apache-2.0",
+  "author": "Richard McQuiston <richard.mcquiston01@gmail.com>",
+  "homepage": "https://github.com/RichardMcQuiston01/error-log-adapter/tree/main/packages/nats#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RichardMcQuiston01/error-log-adapter.git",
+    "directory": "packages/nats"
+  },
+  "bugs": {
+    "url": "https://github.com/RichardMcQuiston01/error-log-adapter/issues"
+  },
+  "keywords": [
+    "typescript",
+    "error-logging",
+    "logger",
+    "adapter-pattern",
+    "nats",
+    "jetstream"
+  ],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@richardmcquiston01/error-log-adapter": ">=0.15.0"
+  },
+  "devDependencies": {
+    "nats": "^2.29.3"
+  },
+  "funding": {
+    "type": "individual",
+    "url": "https://donate.stripe.com/00w5kD3Gj1Xo9v7gVOcs800"
+  }
+}
