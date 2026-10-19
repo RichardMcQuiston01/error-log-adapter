@@ -26,6 +26,16 @@
         "ws": "^8.22.0",
       },
     },
+    "packages/arangodb": {
+      "name": "@richardmcquiston01/error-log-adapter-arangodb",
+      "version": "0.1.0",
+      "devDependencies": {
+        "arangojs": "^10.6.0",
+      },
+      "peerDependencies": {
+        "@richardmcquiston01/error-log-adapter": ">=0.15.0",
+      },
+    },
     "packages/clickhouse": {
       "name": "@richardmcquiston01/error-log-adapter-clickhouse",
       "version": "0.1.0",
@@ -278,6 +288,8 @@
 
     "@redis/time-series": ["@redis/time-series@6.3.0", "", { "peerDependencies": { "@redis/client": "^6.3.0" } }, "sha512-+fJOB8mN1z5WRakCJNh5lVdz1KqvHGSOistsKeitD24QsCtPwyRQXWC0iq6T/i/ubLE/YcguZqPm8F598MKk4A=="],
 
+    "@richardmcquiston01/error-log-adapter-arangodb": ["@richardmcquiston01/error-log-adapter-arangodb@workspace:packages/arangodb"],
+
     "@richardmcquiston01/error-log-adapter-clickhouse": ["@richardmcquiston01/error-log-adapter-clickhouse@workspace:packages/clickhouse"],
 
     "@richardmcquiston01/error-log-adapter-couchdb": ["@richardmcquiston01/error-log-adapter-couchdb@workspace:packages/couchdb"],
@@ -413,6 +425,8 @@
     "anynum": ["anynum@1.0.1", "", {}, "sha512-N6//FLET/tXYNM/F6ABca1oH6fWB+KlTt909Le28WMDBk8oaT4vY17DCrwg2MvmuqUKt3Ni4N5dGJ/EoBgcO6A=="],
 
     "apache-arrow": ["apache-arrow@21.2.0", "", { "dependencies": { "@types/node": "^25.2.0", "flatbuffers": "^25.1.24", "json-with-bigint": "^3.5.3", "tslib": "^2.6.2" }, "bin": { "arrow2csv": "bin/arrow2csv.js" } }, "sha512-Hxe6Agq26gQOM954qpzYSllJBPJl+e16U5CkfuMUhLrNba+5nKkttIVlflaovN6oaTratqMGAO8H5u/aNhmHWQ=="],
+
+    "arangojs": ["arangojs@10.6.0", "", { "dependencies": { "@types/node": "^20.11.26" }, "peerDependencies": { "undici": ">=5.21.0" }, "optionalPeers": ["undici"] }, "sha512-mLELch6qYJLNmprJP75eLVQHe+tfOcm1z/MFOc1bH0y0mevV7Feo4dHF8TkpYvXzmhsp4wjmBi5i37sMvdEKHA=="],
 
     "assertion-error": ["assertion-error@1.1.0", "", {}, "sha512-jgsaNduz+ndvGyFt3uSuWqvy4lCnIJiovtouQN5JZHOKCS2QuhEdbcQHFhVksz2N2U9hXJo8odG7ETyWlEeuDw=="],
 
