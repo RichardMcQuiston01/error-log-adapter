@@ -26,6 +26,16 @@
         "ws": "^8.22.0",
       },
     },
+    "packages/clickhouse": {
+      "name": "@richardmcquiston01/error-log-adapter-clickhouse",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@clickhouse/client": "^1.12.1",
+      },
+      "peerDependencies": {
+        "@richardmcquiston01/error-log-adapter": ">=0.15.0",
+      },
+    },
     "packages/nats": {
       "name": "@richardmcquiston01/error-log-adapter-nats",
       "version": "0.1.0",
@@ -92,6 +102,8 @@
     "@aws-sdk/xml-builder": ["@aws-sdk/xml-builder@3.972.41", "", { "dependencies": { "@smithy/types": "^4.19.0", "tslib": "^2.6.2" } }, "sha512-ctjVSyCMegrWfXlx6VqzSBFI6UqmQ5ZlnfMhdLIiWmhoH8UAQxSCP5N3OpG7X3k4LnS7ou74C4mt20+bfTW2aQ=="],
 
     "@aws/lambda-invoke-store": ["@aws/lambda-invoke-store@0.3.0", "", {}, "sha512-sl4Bm6yiMNYrZKkqqDFWN0UfnWhlS8ivKxrYl+6t0gCLrqr8y3B2IqZZbFRkfaVVp7C/baApyh71P+LeE1A2sQ=="],
+
+    "@clickhouse/client": ["@clickhouse/client@1.24.1", "", {}, "sha512-1kjKJ4uuD4J9JlRU4CpwEGfecstvtoGreBorhh7CxgB7r7PL54DCLD6gajKZhLCri84XlyD3CUxEm6rYkKC+dA=="],
 
     "@esbuild/aix-ppc64": ["@esbuild/aix-ppc64@0.27.7", "", { "os": "aix", "cpu": "ppc64" }, "sha512-EKX3Qwmhz1eMdEJokhALr0YiD0lhQNwDqkPYyPhiSwKrh7/4KRjQc04sZ8db+5DVVnZ1LmbNDI1uAMPEUBnQPg=="],
 
@@ -232,6 +244,8 @@
     "@redis/search": ["@redis/search@6.3.0", "", { "peerDependencies": { "@redis/client": "^6.3.0" } }, "sha512-RPXAZmKjZZG7Tm7m1w9keFdXzbL91PiSHQBfQRe9xwW40jNsTRbG0FwhIz4QlHPU4gKDAsCy8IQHj4yZl4H9rw=="],
 
     "@redis/time-series": ["@redis/time-series@6.3.0", "", { "peerDependencies": { "@redis/client": "^6.3.0" } }, "sha512-+fJOB8mN1z5WRakCJNh5lVdz1KqvHGSOistsKeitD24QsCtPwyRQXWC0iq6T/i/ubLE/YcguZqPm8F598MKk4A=="],
+
+    "@richardmcquiston01/error-log-adapter-clickhouse": ["@richardmcquiston01/error-log-adapter-clickhouse@workspace:packages/clickhouse"],
 
     "@richardmcquiston01/error-log-adapter-nats": ["@richardmcquiston01/error-log-adapter-nats@workspace:packages/nats"],
 
