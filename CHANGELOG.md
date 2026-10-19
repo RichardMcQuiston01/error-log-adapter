@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### Added
+
+- `packages/neo4j`: `@richardmcquiston01/error-log-adapter-neo4j` (0.1.0). `Neo4jErrorAdapter(driver)` writes each entry as an `:ErrorLog` node through the official `neo4j-driver` (`executeQuery`, write routing), creating a uniqueness constraint on `id` and an index on `occurred_at` on first use. Writes are `MERGE ... ON CREATE SET`, so a repeat of the same entry never duplicates. `logBatch` writes all entries in one `UNWIND` query (one transaction) for `BatchingErrorAdapter`, and `buildNeo4jSchemaStatements()` returns the schema statements. Tested with a fake driver, a compile-time check against the real driver types, and Neo4j's own Cypher parser; not run against a Neo4j server.
+
 ## 0.15.0
 
 ### Changed
