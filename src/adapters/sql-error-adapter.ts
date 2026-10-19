@@ -1,0 +1,185 @@
+import { DEFAULT_TABLE_NAME, assertIdentifier } from '../sql-ident.js';
+import { SqlTableAdapter } from '../sql-table-adapter.js';
+import type { SqlTableOptions } from '../sql-table-adapter.js';
+import type { SerializedErrorLogEntry } from '../serialize.js';
+
+/**
+ * Longest allowed table name. The index name adds `_occurred_at_idx` (16
+ * characters) and Postgres limits identifiers to 63.
+ */
+export const MAX_TABLE_NAME_LENGTH = 47;
+
+export type SqlDialect = 'postgres' | 'mysql';
+
+/**
+ * The only thing these adapters need from a database driver: run one
+ * parameterized statement. `pg` (`Pool` / `Client`) and `mysql2/promise`
+ * (`Pool` / `Connection`) both fit as they are.
+ */
+export interface SqlClientLike {
+  query(sql: string, params: unknown[]): Promise<unknown>;
+}
+
+export interface SqlErrorOptions extends SqlTableOptions {
+  /** Table to write to. Defaults to `error_log`. Letters, digits and `_` only, up to 47 characters. */
+  tableName?: string;
+}
+
+/** Throws a descriptive error unless `tableName` is a short, plain SQL identifier. */
+function assertValidTableName(tableName: string, adapterName: string): void {
+  assertIdentifier(tableName, 'table name', adapterName, MAX_TABLE_NAME_LENGTH);
+}
+
+function quoteIdentifier(dialect: SqlDialect, identifier: string): string {
+  return dialect === 'postgres' ? `"${identifier}"` : `\`${identifier}\``;
+}
+
+/**
+ * Returns the statements that create the error log table and its index for a
+ * dialect. Use this to run your own migration when `createTable` is disabled.
+ *
+ * Postgres gets a native `UUID` key, `JSONB` for the cause, and `TIMESTAMPTZ`
+ * columns. MySQL gets a `CHAR(36)` UUID key (it has no UUID type), a `JSON`
+ * cause, and `DATETIME(3)` columns holding UTC times.
+ */
+export function buildErrorLogTableDdl(
+  dialect: SqlDialect,
+  tableName: string = DEFAULT_TABLE_NAME
+): string[] {
+  assertValidTableName(tableName, 'buildErrorLogTableDdl');
+  const table: string = quoteIdentifier(dialect, tableName);
+  const index: string = quoteIdentifier(
+    dialect,
+    `${tableName}_occurred_at_idx`
+  );
+  if (dialect === 'postgres') {
+    return [
+      `CREATE TABLE IF NOT EXISTS ${table} (` +
+        'id UUID PRIMARY KEY, ' +
+        'code TEXT NOT NULL, ' +
+        'message TEXT NOT NULL, ' +
+        'cause JSONB, ' +
+        'source TEXT, ' +
+        'occurred_at TIMESTAMPTZ NOT NULL, ' +
+        'created_at TIMESTAMPTZ NOT NULL DEFAULT now()' +
+        ')',
+      `CREATE INDEX IF NOT EXISTS ${index} ON ${table} (occurred_at)`,
+    ];
+  }
+  // MySQL has no CREATE INDEX IF NOT EXISTS, so the index is part of the table.
+  return [
+    `CREATE TABLE IF NOT EXISTS ${table} (` +
+      'id CHAR(36) NOT NULL PRIMARY KEY, ' +
+      'code TEXT NOT NULL, ' +
+      'message TEXT NOT NULL, ' +
+      'cause JSON NULL, ' +
+      'source TEXT NULL, ' +
+      'occurred_at DATETIME(3) NOT NULL, ' +
+      'created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3), ' +
+      `INDEX ${index} (occurred_at)` +
+      ')',
+  ];
+}
+
+/**
+ * Returns the statement that widens the `code` and `source` columns of a MySQL
+ * table created by `buildErrorLogTableDdl` in 0.4.0 or earlier, where they were
+ * `VARCHAR(255)` and a longer value made the insert fail. Run it once.
+ */
+export function buildMySqlWidenColumnsSql(
+  tableName: string = DEFAULT_TABLE_NAME
+): string[] {
+  assertValidTableName(tableName, 'buildMySqlWidenColumnsSql');
+  return [
+    `ALTER TABLE ${quoteIdentifier('mysql', tableName)} MODIFY code TEXT NOT NULL, MODIFY source TEXT NULL`,
+  ];
+}
+
+/** `2026-01-02T03:04:05.678Z` becomes `2026-01-02 03:04:05.678`, which MySQL accepts. */
+function toMysqlDateTime(date: Date): string {
+  return date.toISOString().replace('T', ' ').replace('Z', '');
+}
+
+/** Shared by the Postgres and MySQL adapters: only the SQL text and time format differ. */
+abstract class SqlErrorAdapter<
+  TCode extends string = string,
+> extends SqlTableAdapter<TCode> {
+  protected constructor(
+    private readonly client: SqlClientLike,
+    private readonly dialect: SqlDialect,
+    adapterName: string,
+    options: SqlErrorOptions
+  ) {
+    super(
+      adapterName,
+      dialect === 'postgres' ? 'Postgres' : 'MySQL',
+      options,
+      MAX_TABLE_NAME_LENGTH
+    );
+  }
+
+  protected occurredAtParam(entry: SerializedErrorLogEntry): string {
+    const occurredAt: Date = new Date(entry.timestamp);
+    if (Number.isNaN(occurredAt.getTime())) {
+      throw new RangeError(
+        `timestamp "${entry.timestamp}" is not a valid ISO 8601 date`
+      );
+    }
+    return this.dialect === 'postgres'
+      ? occurredAt.toISOString()
+      : toMysqlDateTime(occurredAt);
+  }
+
+  protected insertSql(): string {
+    const placeholders: string =
+      this.dialect === 'postgres'
+        ? '$1, $2, $3, $4, $5, $6'
+        : '?, ?, ?, ?, ?, ?';
+    // A repeated entry id is a retry: keep the stored row instead of failing on the key.
+    const onRepeat: string =
+      this.dialect === 'postgres'
+        ? 'ON CONFLICT (id) DO NOTHING'
+        : 'ON DUPLICATE KEY UPDATE id = id';
+    return `INSERT INTO ${quoteIdentifier(this.dialect, this.tableName)} (id, code, message, cause, source, occurred_at) VALUES (${placeholders}) ${onRepeat}`;
+  }
+
+  protected createStatements(): string[] {
+    return buildErrorLogTableDdl(this.dialect, this.tableName);
+  }
+
+  protected callDriver(sql: string, params: unknown[]): Promise<unknown> {
+    return this.client.query(sql, params);
+  }
+}
+
+/**
+ * Writes entries to Postgres. Pass a `pg` `Pool` or `Client`.
+ *
+ * ```ts
+ * const adapter = new PostgresErrorAdapter(new Pool({ connectionString }));
+ * ```
+ */
+export class PostgresErrorAdapter<
+  TCode extends string = string,
+> extends SqlErrorAdapter<TCode> {
+  /** @throws {RangeError} if `options.tableName` is not a plain identifier of 47 characters or fewer. */
+  constructor(client: SqlClientLike, options: SqlErrorOptions = {}) {
+    super(client, 'postgres', 'PostgresErrorAdapter', options);
+  }
+}
+
+/**
+ * Writes entries to MySQL or MariaDB. Pass a `mysql2/promise` `Pool` or `Connection`.
+ *
+ * ```ts
+ * const adapter = new MySqlErrorAdapter(mysql.createPool(connectionUri));
+ * ```
+ */
+export class MySqlErrorAdapter<
+  TCode extends string = string,
+> extends SqlErrorAdapter<TCode> {
+  /** @throws {RangeError} if `options.tableName` is not a plain identifier of 47 characters or fewer. */
+  constructor(client: SqlClientLike, options: SqlErrorOptions = {}) {
+    super(client, 'mysql', 'MySqlErrorAdapter', options);
+  }
+}
