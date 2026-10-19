@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@richardmcquiston01/error-log-adapter": ["../../src/index.ts"],
+      "@richardmcquiston01/error-log-adapter/kit": ["../../src/kit.ts"]
+    },
+    "rootDir": "../.."
+  },
+  "include": ["src"]
+}
