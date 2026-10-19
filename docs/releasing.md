@@ -13,7 +13,7 @@ The core package (`@richardmcquiston01/error-log-adapter`, at the repository roo
 
 Work follows the usual branches: changes go to `dev` through `feature/` pull requests, and `dev` reaches `main` through a pull request.
 
-1. **Prepare the release on a `feature/` branch off `dev`.** Set the new version in each `package.json` that is being released, turn the `Unreleased` heading in `CHANGELOG.md` into the version heading, and merge the pull request into `dev`.
+1. **Prepare the release on a `feature/` branch off `dev`.** Set the new version in each `package.json` that is being released, turn the `Unreleased` heading in `CHANGELOG.md` into the version heading, update `ROADMAP.md` if something has shipped, and merge the pull request into `dev`.
 2. **Promote `dev` to `main`** with a pull request, and merge it with a merge commit. Then fast-forward `dev` to `main`.
 3. **Check locally if you want to** (nothing here publishes):
 
