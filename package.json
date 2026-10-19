@@ -38,10 +38,18 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
+    },
+    "./kit": {
+      "types": "./dist/kit.d.ts",
+      "import": "./dist/kit.mjs",
+      "require": "./dist/kit.cjs"
     }
   },
   "files": [
     "dist"
+  ],
+  "workspaces": [
+    "packages/*"
   ],
   "publishConfig": {
     "access": "public"

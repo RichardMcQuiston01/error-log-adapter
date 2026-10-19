@@ -209,6 +209,22 @@ const errorLog = new BatchingErrorAdapter(new SlackErrorAdapter(url), {
 
 If your sink can take several entries in one call, add a **`logBatch(entries)`** method with the same return type (the `BatchCapableAdapter` interface). `BatchingErrorAdapter` then sends each batch in one call. The whole batch succeeds or fails together.
 
+## Publishing your adapter as a package
+
+The helpers the built-in adapters use are exported from a separate entry point, so a package of your own does not have to copy them:
+
+```ts
+import {
+  reportFailure,
+  resolveEntryId,
+  resolveTimeoutMs,
+  timeoutMessage,
+  withTimeout,
+} from '@richardmcquiston01/error-log-adapter/kit';
+```
+
+List `@richardmcquiston01/error-log-adapter` as a `peerDependency`, so the application and your package share one copy. `reportFailure` gives the same `console.error` line and `{ ok: false, error }` result as the built-in adapters. The sections below show how the timeout and entry-id helpers fit in.
+
 ## Testing
 
 A fake client is all you need, and it lets you check the failure paths, which matter more than the happy one:
