@@ -1,7 +1,14 @@
 name: Publish
 
-# Publishes to npm when a GitHub release is published. The release tag
-# (e.g. v0.1.0) must match the version in package.json.
+# Publishes to npm when a GitHub release is published. The release tag says what
+# is published, and scripts/resolve-release.ts checks it against package.json:
+#
+#   v0.15.0           the core package at the repository root
+#   rabbitmq-v0.1.0   packages/rabbitmq
+#
+# Publish the core first: every package lists it as a peer dependency, and the
+# check below refuses a package whose peer range the core at this commit does
+# not satisfy. See docs/releasing.md.
 on:
   release:
     types: [published]
@@ -20,24 +27,22 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
       - run: bun install --frozen-lockfile
+      - name: Work out what this release publishes
+        id: target
+        run: bun scripts/resolve-release.ts "$RELEASE_TAG"
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
       - run: bun run lint
       - run: bun run typecheck
       - run: bun run test
-      - name: Verify tag matches package version
-        run: |
-          PACKAGE_VERSION="v$(node -p "require('./package.json').version")"
-          if [ "$GITHUB_REF_NAME" != "$PACKAGE_VERSION" ]; then
-            echo "Release tag $GITHUB_REF_NAME does not match package.json version $PACKAGE_VERSION" >&2
-            exit 1
-          fi
       - run: bun run build
+      - run: bun run build:packages
+      - name: Check the tarballs
+        run: bun scripts/check-pack.ts
       # A version with a prerelease part (1.0.0-rc.1) goes under `next`, never `latest`.
       - name: Publish
-        run: |
-          case "$(node -p "require('./package.json').version")" in
-            *-*) NPM_TAG=next ;;
-            *) NPM_TAG=latest ;;
-          esac
-          npm publish --provenance --access public --tag "$NPM_TAG"
+        working-directory: ${{ steps.target.outputs.dir }}
+        run: npm publish --provenance --access public --tag "$NPM_TAG"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TAG: ${{ steps.target.outputs.npm_tag }}

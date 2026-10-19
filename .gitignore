@@ -35,3 +35,6 @@ next-env.d.ts
 
 # build output
 dist/
+
+# Copied from the repository root by each package's prepack script.
+packages/*/LICENSE

@@ -112,6 +112,26 @@ What changes durability or size, by adapter:
 - **Batching wrapper**: `BatchingErrorAdapter` puts a queue in front of any other adapter. `log()` returns `ok: true` as soon as the entry is queued, so a slow or failing sink never holds up the app, and entries are delivered in order in batches (`batchSize`, default 20, or after `maxWaitMs`, default 5000). A failed delivery is retried with exponential backoff (`retries`, default 3) and then given up on: the entries go to `onDrop` and the console, and `flush()` returns `ok: false` once. Delivery stops at the first failure so a dead sink is not hammered. If the wrapped adapter has a `logBatch` method (the webhook and the SNS adapter do) the batch goes in one call, which for the webhook means one request carrying a JSON array, so the receiver must accept an array; pass `useBatchMethod: false` to keep one request per entry. `ok: true` means _queued_, not stored, and the queue lives in memory: call `flush()` before the process exits, and put a durable adapter beside it in a `CompositeErrorAdapter` if entries must survive a crash. Do not also enable the wrapped adapter's own retries (the webhook's `retries`); they multiply. The buffer holds `maxBuffered` entries (default 1000) and drops the oldest past that.
 - **Webhook**: the URL must be `https://` (or `http://localhost`, `127.0.0.1`, `[::1]`) unless you pass `allowInsecure: true`, because entries carry messages and stack traces. Redirects are not followed, since a redirect would turn the `POST` into a body-less `GET` or re-send the entry and your headers to another host; a redirect is reported as `ok: false`. Failure messages contain only the origin, never the path or query, because webhook URLs often hold a secret. Set `retries` to try again after a network error, a timeout, HTTP 408, 425, 429 or 5xx (exponential backoff with jitter from `retryDelayMs`, capped by `maxRetryDelayMs`, honoring `Retry-After`; other 4xx answers are never retried). With `retries` set, every attempt sends the same body including an `id`, so the receiver can drop a repeat. Set `signingSecret` to add `X-Signature-Timestamp` and `X-Signature-256` (`sha256=` + hex HMAC-SHA256 of `<timestamp>.<body>`); the receiver recomputes it and rejects old timestamps.
 
+### Adapter packages
+
+Sinks that need their own client conventions live in separate packages, so the core stays dependency-free. Each one takes a client you create (through a small structural interface, like the adapters above), has its own README with the table or document it writes, and lists this package as a peer dependency. Install it next to the core and its client:
+
+| Package                                                         | Sink                                  | Client                                                        |
+| --------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------- |
+| [`error-log-adapter-rabbitmq`](packages/rabbitmq/README.md)     | A RabbitMQ exchange or queue          | `amqplib`                                                     |
+| [`error-log-adapter-nats`](packages/nats/README.md)             | A NATS subject, or a JetStream stream | `nats`                                                        |
+| [`error-log-adapter-clickhouse`](packages/clickhouse/README.md) | A ClickHouse table                    | `@clickhouse/client`                                          |
+| [`error-log-adapter-influxdb`](packages/influxdb/README.md)     | InfluxDB 2.x or 3 points              | `@influxdata/influxdb-client`, `@influxdata/influxdb3-client` |
+| [`error-log-adapter-couchdb`](packages/couchdb/README.md)       | CouchDB documents                     | `nano`                                                        |
+| [`error-log-adapter-arangodb`](packages/arangodb/README.md)     | ArangoDB documents                    | `arangojs`                                                    |
+| [`error-log-adapter-cassandra`](packages/cassandra/README.md)   | A Cassandra / ScyllaDB table          | `cassandra-driver`                                            |
+
+```bash
+npm install @richardmcquiston01/error-log-adapter @richardmcquiston01/error-log-adapter-rabbitmq amqplib
+```
+
+The package names are `@richardmcquiston01/error-log-adapter-<name>`. They use the helpers exported from `@richardmcquiston01/error-log-adapter/kit`, which is also what you import to write your own adapter package (see [docs/custom-adapters.md](docs/custom-adapters.md)). MariaDB and Percona work with `MySqlErrorAdapter`, and CockroachDB speaks the Postgres wire protocol; these have not yet been tested against the real servers.
+
 ### When a sink is slow or down
 
 `log()` never rejects, and it does not wait forever either. Every adapter that talks over a network or to a driver takes `timeoutMs` (default `10000`; `Infinity` waits without limit). When it passes, `log()` returns `{ ok: false }` with a message such as `Postgres did not respond within 10000 ms, so the entry may or may not have been stored`. Drivers cannot cancel a call, so the write may still finish afterwards (the webhook is the exception: its request is aborted). `CompositeErrorAdapter` has its own per-adapter `timeoutMs` (default `30000`), so one hung custom adapter cannot hold back the others.
@@ -363,7 +383,7 @@ bun run test:live   # opt-in tests against real services, see below
 | SNS             | `SNS_TEST_REGION`                 | SNS and SQS, or LocalStack / moto via an endpoint        |
 | Firestore       | `FIRESTORE_TEST_PROJECT_ID`       | Firestore, or the emulator via `FIRESTORE_EMULATOR_HOST` |
 
-Releases are published to npm by the `Publish` GitHub Action when a GitHub release is created. The release tag must match the version in `package.json` (for example `v0.1.0`).
+Releases are published to npm by the `Publish` GitHub Action when a GitHub release is created. The tag names what is published and must match that package's `package.json`: `v0.15.0` for this package, `rabbitmq-v0.1.0` for `packages/rabbitmq`. Publish this package first. See [docs/releasing.md](docs/releasing.md).
 
 [Back to Top](#table-of-contents)
 
