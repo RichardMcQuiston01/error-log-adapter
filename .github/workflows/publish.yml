@@ -31,6 +31,13 @@ jobs:
             exit 1
           fi
       - run: bun run build
-      - run: npm publish --provenance --access public
+      # A version with a prerelease part (1.0.0-rc.1) goes under `next`, never `latest`.
+      - name: Publish
+        run: |
+          case "$(node -p "require('./package.json').version")" in
+            *-*) NPM_TAG=next ;;
+            *) NPM_TAG=latest ;;
+          esac
+          npm publish --provenance --access public --tag "$NPM_TAG"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

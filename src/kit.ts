@@ -4,6 +4,10 @@
  * `@richardmcquiston01/error-log-adapter/kit`. They are the same helpers the
  * built-in adapters use, so a separate package behaves the same way: one
  * failure format, one timeout rule, one entry-id rule.
+ *
+ * @experimental Not covered by the semver rules in docs/versioning-policy.md
+ * yet. It may change in a minor release until the first adapter packages have
+ * shipped against it.
  */
 export { DEFAULT_PREFIX, reportFailure } from './fail.js';
 export type { FailureReport } from './fail.js';
