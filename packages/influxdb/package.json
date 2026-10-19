@@ -1,0 +1,56 @@
+{
+  "name": "@richardmcquiston01/error-log-adapter-influxdb",
+  "version": "0.1.0",
+  "description": "InfluxDB adapter for @richardmcquiston01/error-log-adapter: writes each error as a line-protocol point through the InfluxDB 2.x or 3.x client.",
+  "license": "Apache-2.0",
+  "author": "Richard McQuiston <richard.mcquiston01@gmail.com>",
+  "homepage": "https://github.com/RichardMcQuiston01/error-log-adapter/tree/main/packages/influxdb#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RichardMcQuiston01/error-log-adapter.git",
+    "directory": "packages/influxdb"
+  },
+  "bugs": {
+    "url": "https://github.com/RichardMcQuiston01/error-log-adapter/issues"
+  },
+  "keywords": [
+    "typescript",
+    "error-logging",
+    "logger",
+    "adapter-pattern",
+    "influxdb",
+    "time-series"
+  ],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@richardmcquiston01/error-log-adapter": ">=0.15.0"
+  },
+  "devDependencies": {
+    "@influxdata/influxdb-client": "^1.35.0",
+    "@influxdata/influxdb3-client": "^2.4.0"
+  },
+  "funding": {
+    "type": "individual",
+    "url": "https://donate.stripe.com/00w5kD3Gj1Xo9v7gVOcs800"
+  }
+}
