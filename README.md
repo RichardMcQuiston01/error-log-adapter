@@ -5,7 +5,7 @@
 
 ## Table of Contents
 
-| [Overview](#overview) | [Getting Started](#getting-started) | [Buy Me a Coffee](#buy-me-a-coffee) | [License](#license) | [Copyright](#copyright) |
+| [Overview](#overview) | [Getting Started](#getting-started) | [Stability](#stability) | [Buy Me a Coffee](#buy-me-a-coffee) | [License](#license) | [Copyright](#copyright) |
 
 ## Overview
 
@@ -364,6 +364,12 @@ bun run test:live   # opt-in tests against real services, see below
 | Firestore       | `FIRESTORE_TEST_PROJECT_ID`       | Firestore, or the emulator via `FIRESTORE_EMULATOR_HOST` |
 
 Releases are published to npm by the `Publish` GitHub Action when a GitHub release is created. The release tag must match the version in `package.json` (for example `v0.1.0`).
+
+[Back to Top](#table-of-contents)
+
+## Stability
+
+From 1.0.0 the package follows [Semantic Versioning](https://semver.org/): the `ErrorLogAdapter` contract, every adapter, the setup helpers and the `...Like` client types change in a breaking way only in a major version. Anything tagged `@experimental` may change in a minor release. See [Versioning, support and deprecation](docs/versioning-policy.md) and [SECURITY.md](SECURITY.md).
 
 [Back to Top](#table-of-contents)
 

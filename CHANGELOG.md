@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## Unreleased
+
+### Removed
+
+- `formatErrorLogLine` is no longer exported from the package entry point. It is how `FlatFileErrorAdapter` writes a line; pass `formatLine` to change that. **Breaking** for code that imported it.
+
+### Added
+
+- `docs/versioning-policy.md` (what is public, Stable and Experimental, version numbers, support, deprecation) and `SECURITY.md` (private vulnerability reporting).
+- Compile-time checks that the real `mongodb`, `mysql2`, `pg`, `redis`, `@supabase/supabase-js`, `firebase-admin`, `ws` and DOM client types fit the `...Like` interfaces. With them every adapter meets the rule for Stable in the policy. Dev-only; nothing changes in the published package.
+- The publish workflow publishes a prerelease version (for example `1.0.0-rc.1`) under the `next` npm tag instead of `latest`.
+- `@richardmcquiston01/error-log-adapter/kit` exports the helpers the built-in adapters use (`reportFailure`, `withTimeout`, `resolveTimeoutMs`, `timeoutMessage`, `SinkTimeoutError`, `resolveEntryId`, `hasCallerId`, `generateId`, `describeError`, `backoffDelayMs`, `SerialQueue`, `assertIdentifier` and the related defaults), so adapter packages published separately behave the same way as the built-in ones. Nothing changes for code that imports the main entry point.
+- The repository is now a bun workspace: optional adapter packages go under `packages/`, each depending on the core as a peer dependency. See `packages/README.md`.
+
 ## 0.14.0
 
 ### Added

@@ -13,7 +13,9 @@ Every export of `@richardmcquiston01/error-log-adapter`, with a proposed label f
 
 An adapter whose only evidence is a fake client it was written against is Experimental. A fake can only agree with the interface it was written from.
 
-This is a proposal. Nothing is removed or relabeled until it is approved.
+**Decided.** `formatErrorLogLine` is no longer exported. Real-driver type tests (`src/adapters/real-driver-types.test.ts`) now cover the nine adapters listed as Experimental below, so all 21 adapters meet the rule and nothing is tagged `@experimental` at 1.0. The conditional `node:sqlite` test is accepted as enough for `SqliteErrorAdapter`. Both SQL setup function names stay for now; renaming one is breaking and is left for a decision before 1.0.0. The tables below show the state before this change.
+
+**The `/kit` entry point.** `@richardmcquiston01/error-log-adapter/kit` re-exports internal helpers (`reportFailure`, `withTimeout`, `resolveEntryId` and others) for adapter packages. It is **Experimental** until the first adapter packages have shipped against it.
 
 ## What the evidence shows
 
