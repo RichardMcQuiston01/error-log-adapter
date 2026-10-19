@@ -39,7 +39,8 @@
   },
   "scripts": {
     "build": "tsup",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepack": "node -e \"require('fs').copyFileSync('../../LICENSE','LICENSE')\""
   },
   "peerDependencies": {
     "@richardmcquiston01/error-log-adapter": ">=0.15.0"
