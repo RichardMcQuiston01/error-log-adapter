@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## neo4j-v0.1.0
 
 ### Added
 
