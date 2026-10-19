@@ -81,4 +81,5 @@ Writes use `MERGE (e:ErrorLog {id: $id}) ON CREATE SET ...`, so logging the same
 - Unit tests with a fake driver.
 - A compile-time check that the real `neo4j-driver` `Driver` fits the adapter's driver type.
 - Every Cypher statement is parsed by Neo4j's own Cypher parser (`@neo4j-cypher/language-support`).
-- **Not run against a Neo4j server.** Please report anything that behaves differently on a real one.
+- An opt-in live test (`neo4j-error-adapter.live.test.ts`) ran against real Neo4j 5 and 4.4 servers in Docker: the node's properties, the constraint and index, a repeated `id` not duplicating, a batch, and a failed login coming back as `ok: false`. It is skipped unless `NEO4J_TEST_URL` is set; see the file for how to run it.
+- Not tested: clusters (routing), Aura, and any version other than 5 and 4.4.
