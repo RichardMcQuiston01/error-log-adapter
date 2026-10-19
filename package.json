@@ -59,9 +59,10 @@
     "prepublishOnly": "bun run build",
     "test": "vitest run",
     "test:live": "vitest run .live.test",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && bun run --filter './packages/*' typecheck",
     "lint": "prettier --check .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "build:packages": "bun run --filter './packages/*' build"
   },
   "devDependencies": {
     "@aws-sdk/client-cloudwatch-logs": "^3.1152.0",

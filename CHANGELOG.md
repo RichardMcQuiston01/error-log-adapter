@@ -8,6 +8,7 @@
 
 ### Added
 
+- `packages/rabbitmq`: `@richardmcquiston01/error-log-adapter-rabbitmq` (0.1.0, not yet published). `RabbitMqErrorAdapter(channel, options)` publishes each entry as a JSON message through an amqplib `Channel` or `ConfirmChannel`, with the entry `id` as the message id, the `code` as the message type and `code` / `source` as headers. `confirm: true` waits for the broker's acknowledgement; `logBatch` lets `BatchingErrorAdapter` wrap it. Root `build:packages` and `typecheck` now cover every package, and a root `vitest.config.ts` resolves the core by name to the source so package tests need no build.
 - `docs/versioning-policy.md` (what is public, Stable and Experimental, version numbers, support, deprecation) and `SECURITY.md` (private vulnerability reporting).
 - Compile-time checks that the real `mongodb`, `mysql2`, `pg`, `redis`, `@supabase/supabase-js`, `firebase-admin`, `ws` and DOM client types fit the `...Like` interfaces. With them every adapter meets the rule for Stable in the policy. Dev-only; nothing changes in the published package.
 - The publish workflow publishes a prerelease version (for example `1.0.0-rc.1`) under the `next` npm tag instead of `latest`.

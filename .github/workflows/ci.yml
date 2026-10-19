@@ -19,6 +19,7 @@ jobs:
       - run: bun run typecheck
       - run: bun run test
       - run: bun run build
+      - run: bun run build:packages
 
   # The file adapters handle Windows paths (drive letters, backslashes), which
   # the Linux job above cannot exercise.
