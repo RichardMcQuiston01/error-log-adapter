@@ -30,11 +30,23 @@ Planned adapters, in priority order.
 - WebSocket: JSON entries over a caller-owned socket (anything with `send` and `readyState`); fails descriptively when the socket is not open
 - AWS CloudWatch Logs: `PutLogEvents` through an injected client, one group/stream per adapter, optional batching within the request limits
 - AWS SNS: `Publish` through an injected client, `code` and `source` as filterable message attributes, FIFO topics with deduplication by entry id
+- `/kit` entry point: the helpers adapter packages build on (experimental until the packages have settled)
+- Optional adapter packages (published with 0.15.0; each has its own README under `packages/` and is versioned on its own):
+  - `@richardmcquiston01/error-log-adapter-rabbitmq` 0.1.0: RabbitMQ through an `amqplib` channel, with optional broker confirms
+  - `@richardmcquiston01/error-log-adapter-nats` 0.1.0: core NATS, and JetStream with de-duplication by entry id
+  - `@richardmcquiston01/error-log-adapter-clickhouse` 0.1.0: a `ReplacingMergeTree` table with async inserts and a one-insert `logBatch`
+  - `@richardmcquiston01/error-log-adapter-influxdb` 0.1.0: InfluxDB 2.x and 3 points
+  - `@richardmcquiston01/error-log-adapter-couchdb` 0.1.0: documents keyed by entry id, so retries never duplicate
+  - `@richardmcquiston01/error-log-adapter-arangodb` 0.1.0: documents keyed by entry id
+  - `@richardmcquiston01/error-log-adapter-cassandra` 0.1.0: a time-bucketed table
 - Batching wrapper: `BatchingErrorAdapter` queues, batches and retries in front of any adapter; the webhook adds `logBatch` (one request, JSON array)
 
 ## Next Up
 
-Optional adapter packages under `packages/` (core stays dependency-free). RabbitMQ (`packages/rabbitmq`), NATS (`packages/nats`), ClickHouse (`packages/clickhouse`), InfluxDB (`packages/influxdb`), CouchDB (`packages/couchdb`), ArangoDB (`packages/arangodb`) and Cassandra (`packages/cassandra`) are built and await their first publish. Next: Neo4j. MariaDB, Percona and CockroachDB are expected to work with the MySQL and Postgres adapters and need live tests to confirm. Memcached and RethinkDB are lower priority; OrientDB is not planned.
+- **Neo4j** package (`packages/neo4j`), in progress.
+- **MariaDB, Percona and CockroachDB** are expected to work with the MySQL and Postgres adapters. They need live tests against the real servers to confirm, then a line in the README.
+- Memcached and RethinkDB are lower priority; OrientDB is not planned.
+- Adapter packages that have not been run against a live server (ArangoDB, Cassandra, InfluxDB, NATS, CouchDB, RabbitMQ and ClickHouse each say what they were and were not tested against in their README) would benefit from opt-in live tests, like the ones for S3, SNS, CloudWatch Logs and Firestore.
 
 ## Cross-Cutting Work
 
