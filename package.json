@@ -66,5 +66,9 @@
     "tsup": "^8.5.1",
     "typescript": "^5.4.0",
     "vitest": "^1.6.0"
+  },
+  "funding": {
+    "type": "individual",
+    "url": "https://donate.stripe.com/00w5kD3Gj1Xo9v7gVOcs800"
   }
 }
