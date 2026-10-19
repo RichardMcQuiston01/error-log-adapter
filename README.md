@@ -125,7 +125,6 @@ Sinks that need their own client conventions live in separate packages, so the c
 | [`error-log-adapter-couchdb`](packages/couchdb/README.md)       | CouchDB documents                     | `nano`                                                        |
 | [`error-log-adapter-arangodb`](packages/arangodb/README.md)     | ArangoDB documents                    | `arangojs`                                                    |
 | [`error-log-adapter-cassandra`](packages/cassandra/README.md)   | A Cassandra / ScyllaDB table          | `cassandra-driver`                                            |
-| [`error-log-adapter-neo4j`](packages/neo4j/README.md)           | `:ErrorLog` nodes in Neo4j            | `neo4j-driver`                                                |
 
 ```bash
 npm install @richardmcquiston01/error-log-adapter @richardmcquiston01/error-log-adapter-rabbitmq amqplib
