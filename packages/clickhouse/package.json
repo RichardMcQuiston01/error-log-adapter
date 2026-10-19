@@ -1,0 +1,55 @@
+{
+  "name": "@richardmcquiston01/error-log-adapter-clickhouse",
+  "version": "0.1.0",
+  "description": "ClickHouse adapter for @richardmcquiston01/error-log-adapter: inserts each error as a row in an error_log table through the official ClickHouse client.",
+  "license": "Apache-2.0",
+  "author": "Richard McQuiston <richard.mcquiston01@gmail.com>",
+  "homepage": "https://github.com/RichardMcQuiston01/error-log-adapter/tree/main/packages/clickhouse#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RichardMcQuiston01/error-log-adapter.git",
+    "directory": "packages/clickhouse"
+  },
+  "bugs": {
+    "url": "https://github.com/RichardMcQuiston01/error-log-adapter/issues"
+  },
+  "keywords": [
+    "typescript",
+    "error-logging",
+    "logger",
+    "adapter-pattern",
+    "clickhouse"
+  ],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "prepack": "node -e \"require('fs').copyFileSync('../../LICENSE','LICENSE')\""
+  },
+  "peerDependencies": {
+    "@richardmcquiston01/error-log-adapter": ">=0.15.0"
+  },
+  "devDependencies": {
+    "@clickhouse/client": "^1.12.1"
+  },
+  "funding": {
+    "type": "individual",
+    "url": "https://donate.stripe.com/00w5kD3Gj1Xo9v7gVOcs800"
+  }
+}

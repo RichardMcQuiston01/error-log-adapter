@@ -1,6 +1,6 @@
 {
   "name": "@richardmcquiston01/error-log-adapter",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "description": "Dependency-free TypeScript error logging with pluggable adapters for console, webhook, MongoDB, Postgres, MySQL, SQLite, Redis, S3, IndexedDB, Web Storage, and file sinks.",
   "license": "Apache-2.0",
   "author": "Richard McQuiston <richard.mcquiston01@gmail.com>",
@@ -59,9 +59,10 @@
     "prepublishOnly": "bun run build",
     "test": "vitest run",
     "test:live": "vitest run .live.test",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.scripts.json && bun run --filter './packages/*' typecheck",
     "lint": "prettier --check .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "build:packages": "bun run --filter './packages/*' build"
   },
   "devDependencies": {
     "@aws-sdk/client-cloudwatch-logs": "^3.1152.0",
@@ -72,6 +73,7 @@
     "@supabase/supabase-js": "^2.118.0",
     "@types/node": "^20.0.0",
     "@types/pg": "^8.23.1",
+    "@types/semver": "^7.8.0",
     "@types/ws": "^8.18.2",
     "firebase-admin": "^14.5.0",
     "mongodb": "^7.7.0",
@@ -79,6 +81,7 @@
     "pg": "^8.23.1",
     "prettier": "^3.3.0",
     "redis": "^6.3.0",
+    "semver": "^7.8.5",
     "tsup": "^8.5.1",
     "typescript": "^5.4.0",
     "vitest": "^1.6.0",

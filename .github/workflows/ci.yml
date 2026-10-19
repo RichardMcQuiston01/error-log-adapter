@@ -19,6 +19,9 @@ jobs:
       - run: bun run typecheck
       - run: bun run test
       - run: bun run build
+      - run: bun run build:packages
+      # What `npm publish` would ship for the core and every package.
+      - run: bun scripts/check-pack.ts
 
   # The file adapters handle Windows paths (drive letters, backslashes), which
   # the Linux job above cannot exercise.

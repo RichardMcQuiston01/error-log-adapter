@@ -34,7 +34,7 @@ Planned adapters, in priority order.
 
 ## Next Up
 
-Optional adapter packages under `packages/` (core stays dependency-free), in this order: RabbitMQ, NATS, ClickHouse, InfluxDB, CouchDB, ArangoDB, Cassandra, Neo4j. MariaDB, Percona and CockroachDB are expected to work with the MySQL and Postgres adapters and need live tests to confirm. Memcached and RethinkDB are lower priority; OrientDB is not planned.
+Optional adapter packages under `packages/` (core stays dependency-free). RabbitMQ (`packages/rabbitmq`), NATS (`packages/nats`), ClickHouse (`packages/clickhouse`), InfluxDB (`packages/influxdb`), CouchDB (`packages/couchdb`), ArangoDB (`packages/arangodb`) and Cassandra (`packages/cassandra`) are built and await their first publish. Next: Neo4j. MariaDB, Percona and CockroachDB are expected to work with the MySQL and Postgres adapters and need live tests to confirm. Memcached and RethinkDB are lower priority; OrientDB is not planned.
 
 ## Cross-Cutting Work
 
