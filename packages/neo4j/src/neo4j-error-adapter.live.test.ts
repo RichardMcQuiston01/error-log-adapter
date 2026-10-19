@@ -28,7 +28,7 @@ describe.skipIf(!isConfigured)(
   () => {
     const database: string | undefined = process.env['NEO4J_TEST_DATABASE'];
     const driver: Driver = neo4j.driver(
-      url ?? '',
+      url ?? 'neo4j://localhost:7687',
       neo4j.auth.basic(
         process.env['NEO4J_TEST_USER'] ?? 'neo4j',
         process.env['NEO4J_TEST_PASSWORD'] ?? ''
@@ -138,7 +138,7 @@ describe.skipIf(!isConfigured)(
 
     it('reports a failure instead of throwing when the server rejects the login', async () => {
       const badDriver: Driver = neo4j.driver(
-        url ?? '',
+        url ?? 'neo4j://localhost:7687',
         neo4j.auth.basic('neo4j', 'definitely-not-the-password')
       );
       const failing = new Neo4jErrorAdapter(badDriver, {
