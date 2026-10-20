@@ -4,6 +4,11 @@
 
 ### Added
 
+- `packages/influxdb`: opt-in live tests, run against InfluxDB 2.9 (7 checks) and InfluxDB 3 Core (6 checks) servers in Docker. They are skipped unless `INFLUXDB_TEST_URL` or `INFLUXDB3_TEST_URL` is set.
+- `packages/nats`: an opt-in live test, run against NATS 2.15 and 2.10 servers with JetStream in Docker (all nine checks pass). It is skipped unless `NATS_TEST_URL` is set.
+- `packages/couchdb`: an opt-in live test, run against CouchDB 3.5 and 3.3 servers in Docker (all seven checks pass). It is skipped unless `COUCHDB_TEST_URL` is set.
+- `packages/rabbitmq`: an opt-in live test, run against a RabbitMQ 3.13 broker in Docker (all eight checks pass). It is skipped unless `RABBITMQ_TEST_URL` is set.
+- `packages/clickhouse`: an opt-in live test, run against ClickHouse 26.9 and 24.8 servers in Docker (all nine checks pass). It is skipped unless `CLICKHOUSE_TEST_URL` is set.
 - `packages/cassandra`: an opt-in live test, run against Cassandra 5 and 4.1 servers in Docker (all eight checks pass). It is skipped unless `CASSANDRA_TEST_HOST` is set.
 - `packages/arangodb`: an opt-in live test, run against ArangoDB 3.12 and 3.11 servers in Docker (all seven checks pass). It is skipped unless `ARANGODB_TEST_URL` is set.
 - `packages/neo4j`: an opt-in live test, run against Neo4j 5 and 4.4 servers in Docker (all five checks pass). It is skipped unless `NEO4J_TEST_URL` is set.
