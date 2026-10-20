@@ -41,11 +41,12 @@ Planned adapters, in priority order.
   - `@richardmcquiston01/error-log-adapter-arangodb` 0.1.0: documents keyed by entry id
   - `@richardmcquiston01/error-log-adapter-cassandra` 0.1.0: a time-bucketed table
   - `@richardmcquiston01/error-log-adapter-neo4j` 0.1.0: `:ErrorLog` nodes, `MERGE` on the entry id so retries never duplicate
+  - `@richardmcquiston01/error-log-adapter-memcached` 0.1.0: recent errors as expiring entries plus a fixed-size recent list
 - Batching wrapper: `BatchingErrorAdapter` queues, batches and retries in front of any adapter; the webhook adds `logBatch` (one request, JSON array)
 
 ## Next Up
 
-- Memcached and RethinkDB are lower priority; OrientDB is not planned.
+- **RethinkDB** package (`packages/rethinkdb`) is next. OrientDB is not planned.
 - Run the RabbitMQ live test against RabbitMQ 4 (its Docker image would not start in the sandbox the other live tests were run in).
 
 ## Cross-Cutting Work
