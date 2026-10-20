@@ -321,6 +321,42 @@ describe('NatsJetStreamErrorAdapter', () => {
     });
   });
 
+  it('explains the bare 503 that the nats client raises for a subject no stream captures', async () => {
+    // The real `NatsError` has `code` and `message` both set to "503".
+    const noResponders = Object.assign(new Error('503'), {
+      name: 'NatsError',
+      code: '503',
+    });
+    const { jetstream } = fakeJetStream(() => Promise.reject(noResponders));
+    const result = await new NatsJetStreamErrorAdapter(
+      jetstream,
+      'app.errors'
+    ).log(entry);
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain(
+      'NatsJetStreamErrorAdapter failed to publish to subject "app.errors": NATS answered 503 (no responders)'
+    );
+    expect(result.error).toContain(
+      'no JetStream stream captures the subject "app.errors"'
+    );
+    expect(result.error).toContain('does not have JetStream enabled');
+    expect(result.error).toContain('-js');
+  });
+
+  it('leaves other NatsError codes as the client reports them', async () => {
+    const timeout = Object.assign(new Error('TIMEOUT'), {
+      name: 'NatsError',
+      code: 'TIMEOUT',
+    });
+    const { jetstream } = fakeJetStream(() => Promise.reject(timeout));
+    const result = await new NatsJetStreamErrorAdapter(jetstream, 'a').log(
+      entry
+    );
+    expect(result.error).toBe(
+      'NatsJetStreamErrorAdapter failed to publish to subject "a": TIMEOUT'
+    );
+  });
+
   it('times out when the stream never acknowledges', async () => {
     const { jetstream } = fakeJetStream(() => new Promise(() => undefined));
     const result = await new NatsJetStreamErrorAdapter(jetstream, 'a', {
@@ -386,6 +422,26 @@ describe('NatsJetStreamErrorAdapter', () => {
       expect(result.ok).toBe(false);
       expect(result.error).toContain('503 no responders available');
       expect(result.error).toContain('2 of 3 entries were stored; 1 failed');
+    });
+
+    it('explains the bare 503 in a batch too', async () => {
+      const noResponders = Object.assign(new Error('503'), {
+        name: 'NatsError',
+        code: '503',
+      });
+      const { jetstream } = fakeJetStream(() => Promise.reject(noResponders));
+      const result = await new NatsJetStreamErrorAdapter(
+        jetstream,
+        'app.errors'
+      ).logBatch([
+        { code: 'A', message: '1' },
+        { code: 'B', message: '2' },
+      ]);
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain(
+        'no JetStream stream captures the subject "app.errors"'
+      );
+      expect(result.error).toContain('0 of 2 entries were stored; 2 failed');
     });
 
     it('is used by BatchingErrorAdapter', async () => {

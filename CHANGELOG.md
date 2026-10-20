@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- `packages/nats`: `NatsJetStreamErrorAdapter` now explains the bare `503` that the `nats` client raises when no stream captures the subject (or JetStream is off on the server) instead of returning just `503`. The result says what the 503 means and how to fix it. A later release of the package, with its version raised to 0.1.1, carries this.
+
 ### Added
 
 - `RedisErrorAdapter`, `MongoDbErrorAdapter` and `SqliteErrorAdapter`: live tests against real engines. Redis (`REDIS_TEST_URL`) and MongoDB (`MONGODB_TEST_URL`) are opt-in and passed on Redis 6.2 and 7.4, Valkey 8 and MongoDB 7 and 8.3 in Docker; they check list and stream modes, `maxEntries` on both sides, awkward text, repeats, a refused command, and an unreachable server for Redis, and `_id` handling, duplicate-key retries, a non-retry duplicate-key error and an unreachable server for MongoDB. The SQLite test needs no server: it runs against `node:sqlite` whenever Node has it (the test is skipped otherwise) and checks the table and index, columns, long and awkward text, repeats, your own DDL, concurrent first use, a missing table and a closed database. The documented `bun:sqlite` fit was also confirmed with a one-off script.
