@@ -61,6 +61,12 @@ Both adapters have `logBatch`, so `BatchingErrorAdapter` can wrap them. It check
 
 JetStream drops a repeat of the same `id` within the stream's duplicate window (two minutes by default), so retrying a batch after a failure does not store entries twice. Core NATS cannot detect repeats.
 
+## What was checked
+
+- Unit tests with fake connections, and a compile-time check that the real `nats` types fit the adapters' client types.
+- An opt-in live test (`nats-error-adapter.live.test.ts`) ran against real NATS 2.15 and 2.10 servers with JetStream in Docker. Core: an entry arriving as the JSON message, `code` and `source` as headers, a batch in order, and a closed connection coming back as `ok: false`. JetStream: an entry stored in the stream, a repeat dropped through `Nats-Msg-Id`, a batch that includes an already-stored entry, headers on the stored message, and a subject no stream captures coming back as `ok: false` (the server's answer is a bare `503`). It is skipped unless `NATS_TEST_URL` is set; see the file for how to run it.
+- Not tested: clusters, authentication, TLS, and servers other than 2.15 and 2.10.
+
 ## Compatibility
 
 Requires `@richardmcquiston01/error-log-adapter` 0.15 or newer (the release that adds the `/kit` entry point) as a peer dependency. The `...Like` interfaces are checked against `nats` 2.x types in CI.
