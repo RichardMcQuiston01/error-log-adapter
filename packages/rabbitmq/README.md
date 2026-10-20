@@ -58,6 +58,12 @@ Without `confirm`, `ok: true` means the message was handed to the client's send 
 
 RabbitMQ does not detect repeats. Logging the same entry (same `id`) twice delivers it twice; consumers that need exactly-once handling should de-duplicate on `message-id`.
 
+## What was checked
+
+- Unit tests with fake channels, and a compile-time check that the real `amqplib` channel types fit the adapter's channel type.
+- An opt-in live test (`rabbitmq-error-adapter.live.test.ts`) ran against a real RabbitMQ 3.13 broker in Docker: the body, `messageId`, `type`, `contentType`, persistent delivery mode, timestamp and `code`/`source` headers on a confirmed message; `headers: false`; delivery on a plain channel without `confirm`; a batch in order; a repeated entry arriving twice (as described above); routing through a headers exchange on the `code` header; and a missing exchange and a closed connection coming back as `ok: false`. It is skipped unless `RABBITMQ_TEST_URL` is set; see the file for how to run it.
+- Not tested: RabbitMQ 4 (its Docker image would not start in the environment used), clusters, TLS, quorum queues, and publisher confirms under load.
+
 ## Compatibility
 
 Requires `@richardmcquiston01/error-log-adapter` 0.15 or newer (the release that adds the `/kit` entry point) as a peer dependency.

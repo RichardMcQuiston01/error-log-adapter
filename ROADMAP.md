@@ -30,6 +30,7 @@ Planned adapters, in priority order.
 - WebSocket: JSON entries over a caller-owned socket (anything with `send` and `readyState`); fails descriptively when the socket is not open
 - AWS CloudWatch Logs: `PutLogEvents` through an injected client, one group/stream per adapter, optional batching within the request limits
 - AWS SNS: `Publish` through an injected client, `code` and `source` as filterable message attributes, FIFO topics with deduplication by entry id
+- MariaDB, Percona and CockroachDB: confirmed to work through `MySqlErrorAdapter` (MariaDB 10.11 and 11, Percona Server 8.0, MySQL 8.4) and `PostgresErrorAdapter` (CockroachDB 26.3, Postgres 16) by an opt-in live test
 - `/kit` entry point: the helpers adapter packages build on (experimental until the packages have settled)
 - Optional adapter packages (each has its own README under `packages/` and is versioned on its own):
   - `@richardmcquiston01/error-log-adapter-rabbitmq` 0.1.0: RabbitMQ through an `amqplib` channel, with optional broker confirms
@@ -40,13 +41,14 @@ Planned adapters, in priority order.
   - `@richardmcquiston01/error-log-adapter-arangodb` 0.1.0: documents keyed by entry id
   - `@richardmcquiston01/error-log-adapter-cassandra` 0.1.0: a time-bucketed table
   - `@richardmcquiston01/error-log-adapter-neo4j` 0.1.0: `:ErrorLog` nodes, `MERGE` on the entry id so retries never duplicate
+  - `@richardmcquiston01/error-log-adapter-memcached` 0.1.0: recent errors as expiring entries plus a fixed-size recent list
+  - `@richardmcquiston01/error-log-adapter-rethinkdb` 0.1.0: documents keyed by entry id, native times, a retry keeps the first write
 - Batching wrapper: `BatchingErrorAdapter` queues, batches and retries in front of any adapter; the webhook adds `logBatch` (one request, JSON array)
 
 ## Next Up
 
-- **MariaDB, Percona and CockroachDB** are expected to work with the MySQL and Postgres adapters. They need live tests against the real servers to confirm, then a line in the README.
-- Memcached and RethinkDB are lower priority; OrientDB is not planned.
-- Adapter packages that have not been run against a live server (ArangoDB, Cassandra, Neo4j, InfluxDB, NATS, CouchDB, RabbitMQ and ClickHouse each say what they were and were not tested against in their README) would benefit from opt-in live tests, like the ones for S3, SNS, CloudWatch Logs and Firestore.
+- OrientDB is not planned.
+- Run the RabbitMQ live test against RabbitMQ 4 (its Docker image would not start in the sandbox the other live tests were run in).
 
 ## Cross-Cutting Work
 

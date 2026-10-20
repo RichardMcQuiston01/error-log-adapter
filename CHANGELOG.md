@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## Unreleased
+
+### Added
+
+- `packages/rethinkdb`: `@richardmcquiston01/error-log-adapter-rethinkdb` (0.1.0). `RethinkDbErrorAdapter(table, connection)` stores each entry as a document whose primary key is the entry id, through a `rethinkdb-ts` table, with `cause` as real JSON and `occurred_at` and `created_at` as RethinkDB's native time type (an `occurred_at` index answers "newest first"). Inserts keep the stored document when the key exists, so a retry never duplicates. RethinkDB reports a refused write as `errors > 0` in the result instead of throwing, so the adapter reads that count, and failures carry the driver's short reason instead of its message, which repeats the whole query and document. `logBatch` is one `insert` for `BatchingErrorAdapter`. Tested with a fake table, the real driver's types, and a live test against RethinkDB 2.4 in Docker.
+- `packages/memcached`: `@richardmcquiston01/error-log-adapter-memcached` (0.1.0). `MemcachedErrorAdapter(client)` keeps recent errors in Memcached through a `memjs` client: each entry is JSON under `<keyPrefix><id>`, written with `add` so a repeat is a no-op, expiring after `ttlSeconds` (default seven days), with a fixed-size recent list (`ringSize`, default 100) that `recentSlotKeys` reads newest first. Memcached is a cache and may drop keys, so the README says to pair it with a durable adapter. `logBatch` stores entries in order for `BatchingErrorAdapter`. Tested with a fake client, a compile-time check against the real `memjs` types, and a live test against Memcached 1.6 in Docker.
+- `MySqlErrorAdapter` and `PostgresErrorAdapter`: an opt-in live test (`MYSQL_TEST_URL`, `POSTGRES_TEST_URL`), run against MariaDB 10.11 and 11, Percona Server 8.0, MySQL 8.4, Postgres 16 and CockroachDB 26.3 in Docker. It checks the table and index, the row's columns, JSON causes, long and awkward text (including 4-byte characters), a repeated id keeping the first row, your own DDL with `createTable: false`, entries logged at the same time, and a missing table, a wrong login and an unreachable server coming back as `ok: false`. All pass, so MariaDB, Percona and CockroachDB are now documented as supported.
+- `packages/influxdb`: opt-in live tests, run against InfluxDB 2.9 (7 checks) and InfluxDB 3 Core (6 checks) servers in Docker. They are skipped unless `INFLUXDB_TEST_URL` or `INFLUXDB3_TEST_URL` is set.
+- `packages/nats`: an opt-in live test, run against NATS 2.15 and 2.10 servers with JetStream in Docker (all nine checks pass). It is skipped unless `NATS_TEST_URL` is set.
+- `packages/couchdb`: an opt-in live test, run against CouchDB 3.5 and 3.3 servers in Docker (all seven checks pass). It is skipped unless `COUCHDB_TEST_URL` is set.
+- `packages/rabbitmq`: an opt-in live test, run against a RabbitMQ 3.13 broker in Docker (all eight checks pass). It is skipped unless `RABBITMQ_TEST_URL` is set.
+- `packages/clickhouse`: an opt-in live test, run against ClickHouse 26.9 and 24.8 servers in Docker (all nine checks pass). It is skipped unless `CLICKHOUSE_TEST_URL` is set.
+- `packages/cassandra`: an opt-in live test, run against Cassandra 5 and 4.1 servers in Docker (all eight checks pass). It is skipped unless `CASSANDRA_TEST_HOST` is set.
+- `packages/arangodb`: an opt-in live test, run against ArangoDB 3.12 and 3.11 servers in Docker (all seven checks pass). It is skipped unless `ARANGODB_TEST_URL` is set.
+- `packages/neo4j`: an opt-in live test, run against Neo4j 5 and 4.4 servers in Docker (all five checks pass). It is skipped unless `NEO4J_TEST_URL` is set.
+
 ## neo4j-v0.1.0
 
 ### Added

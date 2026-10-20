@@ -75,8 +75,8 @@ Every adapter takes an optional `prefix` (default `[error-log-adapter]`) that is
 | `ConsoleErrorAdapter`                               | `console.error`                                                | Anywhere      |                                                                     |
 | `WebhookErrorAdapter(url)`                          | HTTP `POST` of the entry as JSON                               | Anywhere      | `headers`, `timeoutMs`, `retries`, `signingSecret`, `allowInsecure` |
 | `MongoDbErrorAdapter(collection)`                   | Anything with `insertOne`, such as a MongoDB `Collection`      | Node          | `timeoutMs`                                                         |
-| `PostgresErrorAdapter(client)`                      | A Postgres table, through `pg`                                 | Node          | `tableName`, `createTable`, `timeoutMs`                             |
-| `MySqlErrorAdapter(client)`                         | A MySQL / MariaDB table, through `mysql2/promise`              | Node          | `tableName`, `createTable`, `timeoutMs`                             |
+| `PostgresErrorAdapter(client)`                      | A Postgres or CockroachDB table, through `pg`                  | Node          | `tableName`, `createTable`, `timeoutMs`                             |
+| `MySqlErrorAdapter(client)`                         | A MySQL, MariaDB or Percona table, through `mysql2/promise`    | Node          | `tableName`, `createTable`, `timeoutMs`                             |
 | `SqliteErrorAdapter(client)`                        | A SQLite table, through any driver                             | Node, Bun     | `tableName`, `createTable`, `timeoutMs`                             |
 | `SupabaseErrorAdapter(client)`                      | A Supabase table, through `supabase-js`                        | Anywhere      | `tableName`, `timeoutMs`                                            |
 | `RedisErrorAdapter(client)`                         | A Redis list or stream                                         | Node          | `mode`, `key`, `maxEntries`, `side`, `timeoutMs`                    |
@@ -126,6 +126,8 @@ Sinks that need their own client conventions live in separate packages, so the c
 | [`error-log-adapter-arangodb`](packages/arangodb/README.md)     | ArangoDB documents                    | `arangojs`                                                    |
 | [`error-log-adapter-cassandra`](packages/cassandra/README.md)   | A Cassandra / ScyllaDB table          | `cassandra-driver`                                            |
 | [`error-log-adapter-neo4j`](packages/neo4j/README.md)           | `:ErrorLog` nodes in Neo4j            | `neo4j-driver`                                                |
+| [`error-log-adapter-memcached`](packages/memcached/README.md)   | Recent errors in Memcached            | `memjs`                                                       |
+| [`error-log-adapter-rethinkdb`](packages/rethinkdb/README.md)   | RethinkDB documents                   | `rethinkdb-ts`                                                |
 
 ```bash
 npm install @richardmcquiston01/error-log-adapter @richardmcquiston01/error-log-adapter-rabbitmq amqplib
