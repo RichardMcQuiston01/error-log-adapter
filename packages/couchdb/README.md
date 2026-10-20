@@ -83,7 +83,8 @@ Because `_id` is the entry's UUID, logging the same entry twice makes CouchDB an
 
 - The tests run the adapter with the real `nano` client against a small in-memory CouchDB stand-in over HTTP, and a compile-time check fits the real `nano` database type to the adapter's `CouchDbDatabaseLike`.
 - The same adapter, and `buildErrorLogIndex()`, were also run against PouchDB Server, a CouchDB-compatible server: documents stored, a repeat and a repeated batch entry kept as one document, a missing database reported, the index created and a time-range query answered through it.
-- It has not been run against Apache CouchDB itself.
+- An opt-in live test (`couchdb-error-adapter.live.test.ts`) ran against real Apache CouchDB 3.5 and 3.3 servers in Docker: the document keyed by the entry id, `cause` stored as JSON, an absent `cause`, `source` and (with `docType: ''`) `type` left out, a repeat keeping the first write, a batch that includes an existing id, a time-range query answered through the `buildErrorLogIndex()` index with no warning from CouchDB, and a missing database (404) and a wrong login (401) coming back as `ok: false`. It is skipped unless `COUCHDB_TEST_URL` is set; see the file for how to run it.
+- Not tested: clusters, CouchDB 2.x, Cloudant, and replication conflicts.
 
 ## Compatibility
 
