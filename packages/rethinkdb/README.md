@@ -99,3 +99,7 @@ RethinkDB answers a refused write with a result whose `errors` count is not 0, n
 ## Compatibility
 
 Requires `@richardmcquiston01/error-log-adapter` 0.15 or newer (the release that adds the `/kit` entry point) as a peer dependency. The table type is checked against `rethinkdb-ts` 3.
+
+### TypeScript and `skipLibCheck`
+
+This package's own types check cleanly in strict mode. `rethinkdb-ts` 3.0.0's declaration file does not always: with `skipLibCheck: false`, TypeScript 7.0.2 and a current `@types/node` report an error in `rethinkdb-ts/lib/response/cursor.d.ts` (its `[Symbol.asyncIterator]` return type is missing `[Symbol.asyncDispose]`). The error is in `rethinkdb-ts`, not in this package, and it goes away with `skipLibCheck: true`, which is the usual setting. If your build checks library types strictly, leave `skipLibCheck` on until `rethinkdb-ts` updates its declarations.
