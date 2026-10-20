@@ -87,7 +87,8 @@ A Cassandra insert is an upsert. Logging the same entry again (same `id` **and**
 
 - The unit tests use a fake client and check the exact statements and values: the table statement, the inserts (with and without `cause`/`source`, with a TTL), partition grouping, batch sizes and the error reports. A compile-time check fits the real `cassandra-driver` `Client` type to `CassandraClientLike`.
 - The values the adapter binds were run through the driver's own encoder for the column types (a UUID string as `uuid`, a `Date` as `timestamp`, strings as `text`), and a malformed UUID is rejected by it.
-- **It has not been run against a Cassandra (or ScyllaDB) server.** No server was available when this was written, so the CQL statements have not been executed by a real node.
+- An opt-in live test (`cassandra-error-adapter.live.test.ts`) ran against real Cassandra 5 and 4.1 servers in Docker: the table is created, a row has the expected columns, an absent `cause` and `source` are left null, a repeated id and timestamp rewrites one row, rows come back newest first, the `hour` bucket, a batch spanning two partitions and split by `maxBatchSize`, `ttlSeconds` with a `consistency` level, and a missing keyspace coming back as `ok: false`. It is skipped unless `CASSANDRA_TEST_HOST` is set; see the file for how to run it.
+- Not tested: multi-node clusters, ScyllaDB, and any version other than 5 and 4.1.
 
 ## Compatibility
 
