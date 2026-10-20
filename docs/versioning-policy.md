@@ -26,7 +26,7 @@ An adapter is Stable when either of these holds, and a new adapter starts as Exp
 1. It takes no outside client, and its tests exercise real behavior (the file system, Node's `EventEmitter`).
 2. It takes a client, and the real client type from the vendor's SDK is assigned to the adapter's `...Like` interface in a test that `tsc --noEmit` compiles in CI.
 
-Rule 2 proves the type fits and keeps fitting when the SDK changes. It does not prove the adapter works against a live service; the opt-in live tests cover that for CloudWatch Logs, Firestore, S3, SNS, MySQL and Postgres.
+Rule 2 proves the type fits and keeps fitting when the SDK changes. It does not prove the adapter works against a live service; the opt-in live tests cover that for CloudWatch Logs, Firestore, S3, SNS, Redis, MongoDB, MySQL and Postgres.
 
 ## Version numbers
 
