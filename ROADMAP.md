@@ -46,7 +46,7 @@ Planned adapters, in priority order.
 
 - **MariaDB, Percona and CockroachDB** are expected to work with the MySQL and Postgres adapters. They need live tests against the real servers to confirm, then a line in the README.
 - Memcached and RethinkDB are lower priority; OrientDB is not planned.
-- Adapter packages that have not been run against a live server (ArangoDB, Cassandra, InfluxDB, NATS, CouchDB, RabbitMQ and ClickHouse each say what they were and were not tested against in their README) would benefit from opt-in live tests, like the ones for S3, SNS, CloudWatch Logs and Firestore.
+- Adapter packages that have not been run against a live server (ArangoDB, InfluxDB, NATS, CouchDB, RabbitMQ and ClickHouse each say what they were and were not tested against in their README) would benefit from opt-in live tests, like the ones for S3, SNS, CloudWatch Logs and Firestore.
 
 ## Cross-Cutting Work
 
