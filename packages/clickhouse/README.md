@@ -63,9 +63,11 @@ ClickHouse prefers a few large inserts to many small ones. For heavy traffic put
 
 ClickHouse has no unique keys, so a repeated entry is not rejected. A row with the same `occurred_at` and `id` is collapsed by the table engine when parts merge (the later write wins), and `SELECT ... FINAL` shows the collapsed result immediately. For a retry to collapse, pass the same `id` **and** the same `timestamp`; a retry without a `timestamp` gets a new time and is stored as a second row.
 
-## Checked against a real engine
+## What was checked
 
-The generated `CREATE TABLE` statement and the row shape were run against a real ClickHouse engine (embedded, through chDB): the table is created, `JSONEachRow` inserts with `null` cause and source are accepted, `created_at` fills in, a repeat with the same `id` and `occurred_at` collapses, and the TTL variant is accepted. The adapter has not been run against a ClickHouse server over HTTP; a compile-time test checks that the real `@clickhouse/client` types fit `ClickHouseClientLike`.
+- The generated `CREATE TABLE` statement and the row shape were run against a real ClickHouse engine (embedded, through chDB), and a compile-time test checks that the real `@clickhouse/client` types fit `ClickHouseClientLike`.
+- An opt-in live test (`clickhouse-error-adapter.live.test.ts`) ran the adapter with the real `@clickhouse/client` over HTTP against real ClickHouse 26.9 and 24.8 servers in Docker: the table created on first use, a row's columns, `null` for an absent `cause` and `source`, text with quotes, backslashes, tabs, line breaks, non-ASCII characters and `{y:String}`-style placeholders stored exactly as given, a repeat with the same `id` and `timestamp` collapsing (with `FINAL` and after `OPTIMIZE`), a batch in one insert, plain synchronous inserts (`clickhouseSettings: {}`), the `ttlDays` table, and a missing database and a wrong password coming back as `ok: false`. It is skipped unless `CLICKHOUSE_TEST_URL` is set; see the file for how to run it.
+- Not tested: clusters and replicated engines, ClickHouse Cloud, TLS, and servers older than 24.8.
 
 ## Compatibility
 
