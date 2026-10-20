@@ -75,8 +75,8 @@ Every adapter takes an optional `prefix` (default `[error-log-adapter]`) that is
 | `ConsoleErrorAdapter`                               | `console.error`                                                | Anywhere      |                                                                     |
 | `WebhookErrorAdapter(url)`                          | HTTP `POST` of the entry as JSON                               | Anywhere      | `headers`, `timeoutMs`, `retries`, `signingSecret`, `allowInsecure` |
 | `MongoDbErrorAdapter(collection)`                   | Anything with `insertOne`, such as a MongoDB `Collection`      | Node          | `timeoutMs`                                                         |
-| `PostgresErrorAdapter(client)`                      | A Postgres table, through `pg`                                 | Node          | `tableName`, `createTable`, `timeoutMs`                             |
-| `MySqlErrorAdapter(client)`                         | A MySQL / MariaDB table, through `mysql2/promise`              | Node          | `tableName`, `createTable`, `timeoutMs`                             |
+| `PostgresErrorAdapter(client)`                      | A Postgres or CockroachDB table, through `pg`                  | Node          | `tableName`, `createTable`, `timeoutMs`                             |
+| `MySqlErrorAdapter(client)`                         | A MySQL, MariaDB or Percona table, through `mysql2/promise`    | Node          | `tableName`, `createTable`, `timeoutMs`                             |
 | `SqliteErrorAdapter(client)`                        | A SQLite table, through any driver                             | Node, Bun     | `tableName`, `createTable`, `timeoutMs`                             |
 | `SupabaseErrorAdapter(client)`                      | A Supabase table, through `supabase-js`                        | Anywhere      | `tableName`, `timeoutMs`                                            |
 | `RedisErrorAdapter(client)`                         | A Redis list or stream                                         | Node          | `mode`, `key`, `maxEntries`, `side`, `timeoutMs`                    |
