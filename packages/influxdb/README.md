@@ -96,9 +96,11 @@ Both adapters wait for the write to be accepted and return `ok: false` with the 
 
 Both adapters have `logBatch`, which writes a whole batch in one request, so `BatchingErrorAdapter` can wrap them. It checks every entry first and writes nothing if one is invalid.
 
-## Not covered
+## What was checked
 
-The adapters have not been run against an InfluxDB server, so the server's own line-protocol parser has not seen these points. The escaping of string fields matches the official client's (a test compares them) and tag escaping is deliberately conservative.
+- Unit tests with fakes, and the real clients against a local stub server (the 2.x `WriteApi.flush()` and the 3.x `write()` both reject on HTTP 400, 401 and 503). A compile-time check fits both real clients to the adapters' client types.
+- An opt-in live test (`influxdb-error-adapter.live.test.ts`) ran against a real InfluxDB 2.9 server and a real InfluxDB 3 Core server in Docker. For both: the point's tags and fields, text with quotes, backslashes, commas, equals signs, spaces, line breaks and non-ASCII characters read back exactly as given, a repeated entry overwriting instead of duplicating, two errors with the same tags in the same millisecond staying separate, a batch in one request, and a failure coming back as `ok: false` (a rejected token and a missing bucket on 2.x, an unreachable server on 3). It is skipped unless `INFLUXDB_TEST_URL` or `INFLUXDB3_TEST_URL` is set; see the file for how to run it.
+- Not tested: InfluxDB Cloud, InfluxDB 3 Enterprise or Cloud, a 3.x server with authentication on, and servers other than 2.9 and 3 Core.
 
 ## Compatibility
 
