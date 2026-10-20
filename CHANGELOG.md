@@ -4,6 +4,7 @@
 
 ### Added
 
+- `MySqlErrorAdapter` and `PostgresErrorAdapter`: an opt-in live test (`MYSQL_TEST_URL`, `POSTGRES_TEST_URL`), run against MariaDB 10.11 and 11, Percona Server 8.0, MySQL 8.4, Postgres 16 and CockroachDB 26.3 in Docker. It checks the table and index, the row's columns, JSON causes, long and awkward text (including 4-byte characters), a repeated id keeping the first row, your own DDL with `createTable: false`, entries logged at the same time, and a missing table, a wrong login and an unreachable server coming back as `ok: false`. All pass, so MariaDB, Percona and CockroachDB are now documented as supported.
 - `packages/influxdb`: opt-in live tests, run against InfluxDB 2.9 (7 checks) and InfluxDB 3 Core (6 checks) servers in Docker. They are skipped unless `INFLUXDB_TEST_URL` or `INFLUXDB3_TEST_URL` is set.
 - `packages/nats`: an opt-in live test, run against NATS 2.15 and 2.10 servers with JetStream in Docker (all nine checks pass). It is skipped unless `NATS_TEST_URL` is set.
 - `packages/couchdb`: an opt-in live test, run against CouchDB 3.5 and 3.3 servers in Docker (all seven checks pass). It is skipped unless `COUCHDB_TEST_URL` is set.
