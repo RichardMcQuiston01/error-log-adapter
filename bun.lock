@@ -111,6 +111,16 @@
         "@richardmcquiston01/error-log-adapter": ">=0.15.0",
       },
     },
+    "packages/rethinkdb": {
+      "name": "@richardmcquiston01/error-log-adapter-rethinkdb",
+      "version": "0.1.0",
+      "devDependencies": {
+        "rethinkdb-ts": "^3.0.0",
+      },
+      "peerDependencies": {
+        "@richardmcquiston01/error-log-adapter": ">=0.15.0",
+      },
+    },
   },
   "packages": {
     "@aws-sdk/checksums": ["@aws-sdk/checksums@3.1001.3", "", { "dependencies": { "@aws-sdk/core": "^3.978.3", "@aws-sdk/types": "^3.974.6", "@smithy/core": "^3.35.2", "@smithy/types": "^4.19.0", "tslib": "^2.6.2" } }, "sha512-CcAkVyEUKGngbEqJdVdSc53Iy52+XzVL5NIcTen2BlK8UByNC1DThVtf5VKSrNzyA+SqyTvs+3S+knVBbOUizQ=="],
@@ -330,6 +340,8 @@
     "@richardmcquiston01/error-log-adapter-neo4j": ["@richardmcquiston01/error-log-adapter-neo4j@workspace:packages/neo4j"],
 
     "@richardmcquiston01/error-log-adapter-rabbitmq": ["@richardmcquiston01/error-log-adapter-rabbitmq@workspace:packages/rabbitmq"],
+
+    "@richardmcquiston01/error-log-adapter-rethinkdb": ["@richardmcquiston01/error-log-adapter-rethinkdb@workspace:packages/rethinkdb"],
 
     "@rollup/rollup-android-arm-eabi": ["@rollup/rollup-android-arm-eabi@4.64.6", "", { "os": "android", "cpu": "arm" }, "sha512-FkO19Fowv/OQeJZPVfdetJaI3/VpbZmBsnmAlR/rQ+b3QwfiGQiOpVegpSRH331kelvHTVw9hXYG3DwjAaRzyQ=="],
 
@@ -814,6 +826,8 @@
     "require-directory": ["require-directory@2.1.1", "", {}, "sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q=="],
 
     "resolve-from": ["resolve-from@5.0.0", "", {}, "sha512-qYg9KP24dD5qka9J47d0aVky0N+b4fTU89LN9iDnjB5waksiC49rvMB0PrUJQGoTmH50XPiqOvAjDfaijGxYZw=="],
+
+    "rethinkdb-ts": ["rethinkdb-ts@3.0.0", "", {}, "sha512-UwZeYd7zH1UkqJFChpw8Qv1qykjitlb3ApH3kOGtB06I7D7q9NeKaGQN/txrQZUmYcy5p6McjqsVttIQOdsKjA=="],
 
     "retry": ["retry@0.13.1", "", {}, "sha512-XQBQ3I8W1Cge0Seh+6gjj03LbmRFWuoszgK9ooCpwYIrhhoO80pfq4cUkU5DkknwfOfFteRwlZ56PYOGYyFWdg=="],
 

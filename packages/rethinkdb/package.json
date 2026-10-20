@@ -1,0 +1,56 @@
+{
+  "name": "@richardmcquiston01/error-log-adapter-rethinkdb",
+  "version": "0.1.0",
+  "description": "RethinkDB adapter for @richardmcquiston01/error-log-adapter: stores each error as a document whose primary key is the entry id, so retries never duplicate.",
+  "license": "Apache-2.0",
+  "author": "Richard McQuiston <richard.mcquiston01@gmail.com>",
+  "homepage": "https://github.com/RichardMcQuiston01/error-log-adapter/tree/main/packages/rethinkdb#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RichardMcQuiston01/error-log-adapter.git",
+    "directory": "packages/rethinkdb"
+  },
+  "bugs": {
+    "url": "https://github.com/RichardMcQuiston01/error-log-adapter/issues"
+  },
+  "keywords": [
+    "typescript",
+    "error-logging",
+    "logger",
+    "adapter-pattern",
+    "rethinkdb",
+    "rethinkdb-ts"
+  ],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "prepack": "node -e \"require('fs').copyFileSync('../../LICENSE','LICENSE')\""
+  },
+  "peerDependencies": {
+    "@richardmcquiston01/error-log-adapter": ">=0.15.0"
+  },
+  "devDependencies": {
+    "rethinkdb-ts": "^3.0.0"
+  },
+  "funding": {
+    "type": "individual",
+    "url": "https://donate.stripe.com/00w5kD3Gj1Xo9v7gVOcs800"
+  }
+}
