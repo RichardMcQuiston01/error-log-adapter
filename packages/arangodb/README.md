@@ -81,7 +81,8 @@ Because `_key` is the entry's UUID, logging the same entry twice is harmless. Do
 ## What was checked
 
 - The tests run the adapter with the real `arangojs` client against a small stand-in for ArangoDB's document HTTP API: the request path and `overwriteMode=ignore`, a repeat, a batch, a missing collection (1203), wrong credentials (401) and an unreachable server. A compile-time check fits the real `arangojs` collection type to the adapter's `ArangoCollectionLike`.
-- The stand-in follows ArangoDB's documented behavior; **it has not been run against an ArangoDB server**, which was not available when this was written. If a real server answers differently, the tests would not show it.
+- An opt-in live test (`arangodb-error-adapter.live.test.ts`) ran against real ArangoDB 3.12 and 3.11 servers in Docker: the document keyed by the entry id, `cause` stored as JSON, an absent `cause` and `source` left out, a repeat keeping the first write, a batch that includes an existing key, the `buildErrorLogIndex()` index with a sorted query, a missing collection (1203) and a wrong login coming back as `ok: false`. It is skipped unless `ARANGODB_TEST_URL` is set; see the file for how to run it.
+- Not tested: clusters, servers older than 3.11 (so the fallback for servers before 3.7 has only been tested against the stand-in), and Oasis.
 
 ## Compatibility
 
