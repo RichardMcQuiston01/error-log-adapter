@@ -253,7 +253,11 @@ describe.skipIf(!isConfigured)('NATS adapters against a real server', () => {
       );
       const result = await adapter.log({ code: 'LIVE_FAIL', message: 'no' });
       expect(result.ok).toBe(false);
-      expect(result.error).toBeTruthy();
+      // The client's own error is a bare "503"; the result explains it.
+      expect(result.error).toContain('NATS answered 503 (no responders)');
+      expect(result.error).toContain(
+        `no JetStream stream captures the subject "${subjectPrefix}.nobody.listens"`
+      );
     });
   });
 });

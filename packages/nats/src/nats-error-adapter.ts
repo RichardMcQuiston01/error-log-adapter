@@ -96,6 +96,22 @@ interface PreparedMessage {
   headers?: NatsHeadersLike;
 }
 
+/**
+ * NATS answers a JetStream publish that nothing is listening for with the bare
+ * status `503` ("no responders"): the `nats` client's error has `code` and
+ * `message` both `"503"`. That happens when no stream captures the subject and
+ * when the server has JetStream switched off, so say so.
+ */
+function describeJetStreamError(error: unknown, subject: string): string {
+  if (typeof error === 'object' && error !== null) {
+    const { code } = error as { code?: unknown };
+    if (code === '503') {
+      return `NATS answered 503 (no responders): no JetStream stream captures the subject "${subject}", or the server does not have JetStream enabled. Create a stream whose subjects include "${subject}" (for example with \`nats stream add\`), or start the server with \`-js\``;
+    }
+  }
+  return describeError(error);
+}
+
 const encoder = new TextEncoder();
 
 /**
@@ -319,6 +335,7 @@ export class NatsJetStreamErrorAdapter<
         prefix: this.logPrefix,
         action: `to publish to subject "${this.subject}"`,
         error,
+        reason: describeJetStreamError(error, this.subject),
       });
     }
   }
@@ -397,7 +414,7 @@ export class NatsJetStreamErrorAdapter<
       prefix: this.logPrefix,
       action: `to publish ${count} entr${count === 1 ? 'y' : 'ies'} to subject "${this.subject}"`,
       error,
-      reason: `${describeError(error)} (${context})`,
+      reason: `${describeJetStreamError(error, this.subject)} (${context})`,
     });
   }
 }
