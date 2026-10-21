@@ -4,6 +4,7 @@
 
 ### Added
 
+- `RedisErrorAdapter`, `MongoDbErrorAdapter` and `SqliteErrorAdapter`: live tests against real engines. Redis (`REDIS_TEST_URL`) and MongoDB (`MONGODB_TEST_URL`) are opt-in and passed on Redis 6.2 and 7.4, Valkey 8 and MongoDB 7 and 8.3 in Docker; they check list and stream modes, `maxEntries` on both sides, awkward text, repeats, a refused command, and an unreachable server for Redis, and `_id` handling, duplicate-key retries, a non-retry duplicate-key error and an unreachable server for MongoDB. The SQLite test needs no server: it runs against `node:sqlite` whenever Node has it (the test is skipped otherwise) and checks the table and index, columns, long and awkward text, repeats, your own DDL, concurrent first use, a missing table and a closed database. The documented `bun:sqlite` fit was also confirmed with a one-off script.
 - `packages/rethinkdb`: `@richardmcquiston01/error-log-adapter-rethinkdb` (0.1.0). `RethinkDbErrorAdapter(table, connection)` stores each entry as a document whose primary key is the entry id, through a `rethinkdb-ts` table, with `cause` as real JSON and `occurred_at` and `created_at` as RethinkDB's native time type (an `occurred_at` index answers "newest first"). Inserts keep the stored document when the key exists, so a retry never duplicates. RethinkDB reports a refused write as `errors > 0` in the result instead of throwing, so the adapter reads that count, and failures carry the driver's short reason instead of its message, which repeats the whole query and document. `logBatch` is one `insert` for `BatchingErrorAdapter`. Tested with a fake table, the real driver's types, and a live test against RethinkDB 2.4 in Docker.
 - `packages/memcached`: `@richardmcquiston01/error-log-adapter-memcached` (0.1.0). `MemcachedErrorAdapter(client)` keeps recent errors in Memcached through a `memjs` client: each entry is JSON under `<keyPrefix><id>`, written with `add` so a repeat is a no-op, expiring after `ttlSeconds` (default seven days), with a fixed-size recent list (`ringSize`, default 100) that `recentSlotKeys` reads newest first. Memcached is a cache and may drop keys, so the README says to pair it with a durable adapter. `logBatch` stores entries in order for `BatchingErrorAdapter`. Tested with a fake client, a compile-time check against the real `memjs` types, and a live test against Memcached 1.6 in Docker.
 - `MySqlErrorAdapter` and `PostgresErrorAdapter`: an opt-in live test (`MYSQL_TEST_URL`, `POSTGRES_TEST_URL`), run against MariaDB 10.11 and 11, Percona Server 8.0, MySQL 8.4, Postgres 16 and CockroachDB 26.3 in Docker. It checks the table and index, the row's columns, JSON causes, long and awkward text (including 4-byte characters), a repeated id keeping the first row, your own DDL with `createTable: false`, entries logged at the same time, and a missing table, a wrong login and an unreachable server coming back as `ok: false`. All pass, so MariaDB, Percona and CockroachDB are now documented as supported.
@@ -15,6 +16,12 @@
 - `packages/cassandra`: an opt-in live test, run against Cassandra 5 and 4.1 servers in Docker (all eight checks pass). It is skipped unless `CASSANDRA_TEST_HOST` is set.
 - `packages/arangodb`: an opt-in live test, run against ArangoDB 3.12 and 3.11 servers in Docker (all seven checks pass). It is skipped unless `ARANGODB_TEST_URL` is set.
 - `packages/neo4j`: an opt-in live test, run against Neo4j 5 and 4.4 servers in Docker (all five checks pass). It is skipped unless `NEO4J_TEST_URL` is set.
+
+## nats-v0.1.1
+
+### Fixed
+
+- `packages/nats`: `NatsJetStreamErrorAdapter` now explains the bare `503` that the `nats` client raises when no stream captures the subject (or JetStream is off on the server) instead of returning just `503`. The result says what the 503 means and how to fix it.
 
 ## neo4j-v0.1.0
 
