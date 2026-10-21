@@ -48,7 +48,6 @@ Planned adapters, in priority order.
 ## Next Up
 
 - OrientDB is not planned.
-- Run the RabbitMQ live test against RabbitMQ 4 (its Docker image would not start in the sandbox the other live tests were run in).
 
 ## Cross-Cutting Work
 
