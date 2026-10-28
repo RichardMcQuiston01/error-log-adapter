@@ -133,10 +133,15 @@ export class WebStorageErrorAdapter<
     }
     let appended = false;
     try {
-      await this.locks.request(`error-log-adapter:${this.key}`, (): void => {
-        appended = true;
-        this.append(record);
-      });
+      // Async so a throw becomes a rejection: Node's Web Locks keep the lock
+      // held forever when the callback throws synchronously.
+      await this.locks.request(
+        `error-log-adapter:${this.key}`,
+        async (): Promise<void> => {
+          appended = true;
+          this.append(record);
+        }
+      );
     } catch (error: unknown) {
       if (appended) {
         throw error;

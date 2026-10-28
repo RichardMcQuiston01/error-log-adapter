@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- `WebStorageErrorAdapter`: a failed write inside the `navigator.locks` callback no longer leaves the lock held. Node 24 and later keep a Web Lock forever when its callback throws synchronously, so after one failed write every later `log` in the process waited for ever (browsers release the lock). The callback is now async, so the error comes back as a rejection and the lock is released. This showed up as nine timing-out tests on CI once its runner moved to Node 24.
+
 ### Added
 
 - `RedisErrorAdapter`, `MongoDbErrorAdapter` and `SqliteErrorAdapter`: live tests against real engines. Redis (`REDIS_TEST_URL`) and MongoDB (`MONGODB_TEST_URL`) are opt-in and passed on Redis 6.2 and 7.4, Valkey 8 and MongoDB 7 and 8.3 in Docker; they check list and stream modes, `maxEntries` on both sides, awkward text, repeats, a refused command, and an unreachable server for Redis, and `_id` handling, duplicate-key retries, a non-retry duplicate-key error and an unreachable server for MongoDB. The SQLite test needs no server: it runs against `node:sqlite` whenever Node has it (the test is skipped otherwise) and checks the table and index, columns, long and awkward text, repeats, your own DDL, concurrent first use, a missing table and a closed database. The documented `bun:sqlite` fit was also confirmed with a one-off script.
