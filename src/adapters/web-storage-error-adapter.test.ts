@@ -285,6 +285,30 @@ describe('WebStorageErrorAdapter', () => {
       expect(storage.records()).toHaveLength(1);
     });
 
+    it('never throws synchronously from the lock callback, so a failed write cannot leave the lock held', async () => {
+      const storage = new FakeStorage(1);
+      let threwSynchronously = false;
+      const locks: LockManagerLike = {
+        request<T>(_name: string, callback: () => T | Promise<T>): Promise<T> {
+          try {
+            return Promise.resolve(callback());
+          } catch (error: unknown) {
+            threwSynchronously = true;
+            return Promise.reject(error);
+          }
+        },
+      };
+      const spy = silenceConsole();
+
+      const result = await new WebStorageErrorAdapter(storage, { locks }).log(
+        entry('too big')
+      );
+
+      expect(result.ok).toBe(false);
+      expect(threwSynchronously).toBe(false);
+      spy.mockRestore();
+    });
+
     it('reports a write failure that happens inside the lock once, without retrying', async () => {
       const storage = new FakeStorage(1);
       const { locks, names } = fakeLocks();
