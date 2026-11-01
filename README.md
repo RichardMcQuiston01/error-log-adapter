@@ -19,7 +19,7 @@ The package imports no database or cloud SDKs. Each adapter takes a tiny structu
 
 ### Prerequisites
 
-- Node.js 18 or later, Bun, or a browser. Adapters that need `fetch`, `crypto` or the file system use the runtime's built-ins.
+- Node.js 20 or later, Bun, or a browser. Adapters that need `fetch`, `crypto` or the file system use the runtime's built-ins.
 - TypeScript 5 or later (optional)
 
 ### Installation
