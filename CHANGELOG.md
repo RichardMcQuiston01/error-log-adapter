@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Donations now point at Ko-fi instead of PayPal: the README badge, the `package.json` funding link and a new `.github/FUNDING.yml`. The PayPal QR image is removed.
 - The README now says Node.js 20 or later, matching `docs/versioning-policy.md`, and `package.json` declares it in `engines` (npm only warns; it does not block an install). It said Node.js 18 before, but Node 18 has been end of life since April 2025 and 5 tests fail there, mostly because it has no global Web Crypto, which webhook signing needs. CI now runs the tests on Node 20, 22 and 24.
 
 ### Added
