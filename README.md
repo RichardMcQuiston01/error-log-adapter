@@ -19,7 +19,7 @@ The package imports no database or cloud SDKs. Each adapter takes a tiny structu
 
 ### Prerequisites
 
-- Node.js 18 or later, Bun, or a browser. Adapters that need `fetch`, `crypto` or the file system use the runtime's built-ins.
+- Node.js 20 or later, Bun, or a browser. Adapters that need `fetch`, `crypto` or the file system use the runtime's built-ins.
 - TypeScript 5 or later (optional)
 
 ### Installation
@@ -400,9 +400,7 @@ From 1.0.0 the package follows [Semantic Versioning](https://semver.org/): the `
 
 If this app, code, or repository has helped you or someone you know, please consider donating. I appreciate any help to offset the costs of development and/or AI Credits.
 
-[**Donate via Stripe**](https://donate.stripe.com/00w5kD3Gj1Xo9v7gVOcs800), or scan:
-
-[![Donate via Stripe](./donate.svg)](https://donate.stripe.com/00w5kD3Gj1Xo9v7gVOcs800)
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/P1V529Z7ZP)
 
 [Back to Top](#table-of-contents)
 

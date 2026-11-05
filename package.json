@@ -3,6 +3,9 @@
   "version": "0.15.1",
   "description": "Dependency-free TypeScript error logging with pluggable adapters for console, webhook, MongoDB, Postgres, MySQL, SQLite, Redis, S3, IndexedDB, Web Storage, and file sinks.",
   "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20"
+  },
   "author": "Richard McQuiston <richard.mcquiston01@gmail.com>",
   "homepage": "https://github.com/RichardMcQuiston01/error-log-adapter#readme",
   "repository": {
@@ -89,6 +92,6 @@
   },
   "funding": {
     "type": "individual",
-    "url": "https://donate.stripe.com/00w5kD3Gj1Xo9v7gVOcs800"
+    "url": "https://ko-fi.com/P1V529Z7ZP"
   }
 }
