@@ -2,11 +2,6 @@
 
 ## Unreleased
 
-### Changed
-
-- Donations now point at Ko-fi instead of PayPal: the README badge, the `package.json` funding link and a new `.github/FUNDING.yml`. The PayPal QR image is removed.
-- The README now says Node.js 20 or later, matching `docs/versioning-policy.md`, and `package.json` declares it in `engines` (npm only warns; it does not block an install). It said Node.js 18 before, but Node 18 has been end of life since April 2025 and 5 tests fail there, mostly because it has no global Web Crypto, which webhook signing needs. CI now runs the tests on Node 20, 22 and 24.
-
 ### Added
 
 - `packages/rethinkdb`: `@richardmcquiston01/error-log-adapter-rethinkdb` (0.1.0). `RethinkDbErrorAdapter(table, connection)` stores each entry as a document whose primary key is the entry id, through a `rethinkdb-ts` table, with `cause` as real JSON and `occurred_at` and `created_at` as RethinkDB's native time type (an `occurred_at` index answers "newest first"). Inserts keep the stored document when the key exists, so a retry never duplicates. RethinkDB reports a refused write as `errors > 0` in the result instead of throwing, so the adapter reads that count, and failures carry the driver's short reason instead of its message, which repeats the whole query and document. `logBatch` is one `insert` for `BatchingErrorAdapter`. Tested with a fake table, the real driver's types, and a live test against RethinkDB 2.4 in Docker.
@@ -19,6 +14,13 @@
 - `packages/cassandra`: an opt-in live test, run against Cassandra 5 and 4.1 servers in Docker (all eight checks pass). It is skipped unless `CASSANDRA_TEST_HOST` is set.
 - `packages/arangodb`: an opt-in live test, run against ArangoDB 3.12 and 3.11 servers in Docker (all seven checks pass). It is skipped unless `ARANGODB_TEST_URL` is set.
 - `packages/neo4j`: an opt-in live test, run against Neo4j 5 and 4.4 servers in Docker (all five checks pass). It is skipped unless `NEO4J_TEST_URL` is set.
+
+## 0.15.2
+
+### Changed
+
+- Donations now point at Ko-fi instead of PayPal: the README badge, the `package.json` funding link and a new `.github/FUNDING.yml`. The PayPal QR image is removed.
+- The README now says Node.js 20 or later, matching `docs/versioning-policy.md`, and `package.json` declares it in `engines` (npm only warns; it does not block an install). It said Node.js 18 before, but Node 18 has been end of life since April 2025 and 5 tests fail there, mostly because it has no global Web Crypto, which webhook signing needs. CI now runs the tests on Node 20, 22 and 24.
 
 ## 0.15.1
 
