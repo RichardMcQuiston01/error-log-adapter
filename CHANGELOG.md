@@ -2,15 +2,8 @@
 
 ## Unreleased
 
-### Changed
-
-- Donations now point at Ko-fi instead of PayPal: the README badge, the `package.json` funding link and a new `.github/FUNDING.yml`. The PayPal QR image is removed.
-- The README now says Node.js 20 or later, matching `docs/versioning-policy.md`, and `package.json` declares it in `engines` (npm only warns; it does not block an install). It said Node.js 18 before, but Node 18 has been end of life since April 2025 and 5 tests fail there, mostly because it has no global Web Crypto, which webhook signing needs. CI now runs the tests on Node 20, 22 and 24.
-
 ### Added
 
-- `WebhookErrorAdapter` takes a `formatBody` option: a function that gets the entries in a request (one for `log`, all of them for `logBatch`) and returns the JSON body to send, for receivers that expect a particular shape. It adds no `id`; retries, timeouts, the `https://` rule and `signingSecret` still apply, and a formatter that throws or returns nothing JSON can hold makes `log` return `ok: false` without sending.
-- `formatSlackBody`, `formatGoogleChatBody`, `formatDiscordBody` and `formatTeamsBody` (and the `WebhookBodyFormatter` type): ready-made `formatBody` functions for Slack, Google Chat and Discord incoming webhooks and a Microsoft Teams Workflows webhook. Each shows the code and message, the source and time, and the cause in a code block, cuts text to the service's limit, makes a batch one summary message, and stops an error message from pinging anyone (Slack escapes `&`, `<` and `>`, Google Chat's `<users/all>` is made harmless, Discord sends `allowed_mentions: { parse: [] }`). **Experimental:** tested against each service's documented format, not yet against live webhooks; an opt-in live test (`SLACK_WEBHOOK_TEST_URL` and the like) posts to your own test channel.
 - `packages/rethinkdb`: `@richardmcquiston01/error-log-adapter-rethinkdb` (0.1.0). `RethinkDbErrorAdapter(table, connection)` stores each entry as a document whose primary key is the entry id, through a `rethinkdb-ts` table, with `cause` as real JSON and `occurred_at` and `created_at` as RethinkDB's native time type (an `occurred_at` index answers "newest first"). Inserts keep the stored document when the key exists, so a retry never duplicates. RethinkDB reports a refused write as `errors > 0` in the result instead of throwing, so the adapter reads that count, and failures carry the driver's short reason instead of its message, which repeats the whole query and document. `logBatch` is one `insert` for `BatchingErrorAdapter`. Tested with a fake table, the real driver's types, and a live test against RethinkDB 2.4 in Docker.
 - `packages/memcached`: `@richardmcquiston01/error-log-adapter-memcached` (0.1.0). `MemcachedErrorAdapter(client)` keeps recent errors in Memcached through a `memjs` client: each entry is JSON under `<keyPrefix><id>`, written with `add` so a repeat is a no-op, expiring after `ttlSeconds` (default seven days), with a fixed-size recent list (`ringSize`, default 100) that `recentSlotKeys` reads newest first. Memcached is a cache and may drop keys, so the README says to pair it with a durable adapter. `logBatch` stores entries in order for `BatchingErrorAdapter`. Tested with a fake client, a compile-time check against the real `memjs` types, and a live test against Memcached 1.6 in Docker.
 - `packages/influxdb`: opt-in live tests, run against InfluxDB 2.9 (7 checks) and InfluxDB 3 Core (6 checks) servers in Docker. They are skipped unless `INFLUXDB_TEST_URL` or `INFLUXDB3_TEST_URL` is set.
@@ -21,6 +14,18 @@
 - `packages/cassandra`: an opt-in live test, run against Cassandra 5 and 4.1 servers in Docker (all eight checks pass). It is skipped unless `CASSANDRA_TEST_HOST` is set.
 - `packages/arangodb`: an opt-in live test, run against ArangoDB 3.12 and 3.11 servers in Docker (all seven checks pass). It is skipped unless `ARANGODB_TEST_URL` is set.
 - `packages/neo4j`: an opt-in live test, run against Neo4j 5 and 4.4 servers in Docker (all five checks pass). It is skipped unless `NEO4J_TEST_URL` is set.
+
+## 0.16.0
+
+### Added
+
+- `WebhookErrorAdapter` takes a `formatBody` option: a function that gets the entries in a request (one for `log`, all of them for `logBatch`) and returns the JSON body to send, for receivers that expect a particular shape. It adds no `id`; retries, timeouts, the `https://` rule and `signingSecret` still apply, and a formatter that throws or returns nothing JSON can hold makes `log` return `ok: false` without sending.
+- `formatSlackBody`, `formatGoogleChatBody`, `formatDiscordBody` and `formatTeamsBody` (and the `WebhookBodyFormatter` type): ready-made `formatBody` functions for Slack, Google Chat and Discord incoming webhooks and a Microsoft Teams Workflows webhook. Each shows the code and message, the source and time, and the cause in a code block, cuts text to the service's limit, makes a batch one summary message, and stops an error message from pinging anyone (Slack escapes `&`, `<` and `>`, Google Chat's `<users/all>` is made harmless, Discord sends `allowed_mentions: { parse: [] }`). **Experimental:** tested against each service's documented format, not yet against live webhooks; an opt-in live test (`SLACK_WEBHOOK_TEST_URL` and the like) posts to your own test channel.
+
+### Changed
+
+- Donations now point at Ko-fi instead of PayPal: the README badge, the `package.json` funding link and a new `.github/FUNDING.yml`. The PayPal QR image is removed.
+- The README now says Node.js 20 or later, matching `docs/versioning-policy.md`, and `package.json` declares it in `engines` (npm only warns; it does not block an install). It said Node.js 18 before, but Node 18 has been end of life since April 2025 and 5 tests fail there, mostly because it has no global Web Crypto, which webhook signing needs. CI now runs the tests on Node 20, 22 and 24.
 
 ## 0.15.1
 
