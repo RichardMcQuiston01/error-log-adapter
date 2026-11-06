@@ -1,0 +1,57 @@
+{
+  "name": "@richardmcquiston01/error-log-adapter-google-sheets",
+  "version": "0.1.0",
+  "description": "Google Sheets adapter for @richardmcquiston01/error-log-adapter: appends each error as a row in a spreadsheet, and a whole batch in one request.",
+  "license": "Apache-2.0",
+  "author": "Richard McQuiston <richard.mcquiston01@gmail.com>",
+  "homepage": "https://github.com/RichardMcQuiston01/error-log-adapter/tree/main/packages/google-sheets#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RichardMcQuiston01/error-log-adapter.git",
+    "directory": "packages/google-sheets"
+  },
+  "bugs": {
+    "url": "https://github.com/RichardMcQuiston01/error-log-adapter/issues"
+  },
+  "keywords": [
+    "typescript",
+    "error-logging",
+    "logger",
+    "adapter-pattern",
+    "google-sheets",
+    "spreadsheet",
+    "googleapis"
+  ],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "prepack": "node -e \"require('fs').copyFileSync('../../LICENSE','LICENSE')\""
+  },
+  "peerDependencies": {
+    "@richardmcquiston01/error-log-adapter": ">=0.15.0"
+  },
+  "devDependencies": {
+    "@googleapis/sheets": "^18.1.2"
+  },
+  "funding": {
+    "type": "individual",
+    "url": "https://ko-fi.com/P1V529Z7ZP"
+  }
+}

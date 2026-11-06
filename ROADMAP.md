@@ -47,6 +47,7 @@ Planned adapters, in priority order.
 
 ## Next Up
 
+- `@richardmcquiston01/error-log-adapter-google-sheets` 0.1.0: rows in a Google Sheets tab, one request per batch. Written and tested with a fake client; it still needs its live test run against a real spreadsheet before release.
 - OrientDB is not planned.
 
 ## Cross-Cutting Work

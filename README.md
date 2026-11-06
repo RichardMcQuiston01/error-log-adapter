@@ -117,18 +117,19 @@ What changes durability or size, by adapter:
 
 Sinks that need their own client conventions live in separate packages, so the core stays dependency-free. Each one takes a client you create (through a small structural interface, like the adapters above), has its own README with the table or document it writes, and lists this package as a peer dependency. Install it next to the core and its client:
 
-| Package                                                         | Sink                                  | Client                                                        |
-| --------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------- |
-| [`error-log-adapter-rabbitmq`](packages/rabbitmq/README.md)     | A RabbitMQ exchange or queue          | `amqplib`                                                     |
-| [`error-log-adapter-nats`](packages/nats/README.md)             | A NATS subject, or a JetStream stream | `nats`                                                        |
-| [`error-log-adapter-clickhouse`](packages/clickhouse/README.md) | A ClickHouse table                    | `@clickhouse/client`                                          |
-| [`error-log-adapter-influxdb`](packages/influxdb/README.md)     | InfluxDB 2.x or 3 points              | `@influxdata/influxdb-client`, `@influxdata/influxdb3-client` |
-| [`error-log-adapter-couchdb`](packages/couchdb/README.md)       | CouchDB documents                     | `nano`                                                        |
-| [`error-log-adapter-arangodb`](packages/arangodb/README.md)     | ArangoDB documents                    | `arangojs`                                                    |
-| [`error-log-adapter-cassandra`](packages/cassandra/README.md)   | A Cassandra / ScyllaDB table          | `cassandra-driver`                                            |
-| [`error-log-adapter-neo4j`](packages/neo4j/README.md)           | `:ErrorLog` nodes in Neo4j            | `neo4j-driver`                                                |
-| [`error-log-adapter-memcached`](packages/memcached/README.md)   | Recent errors in Memcached            | `memjs`                                                       |
-| [`error-log-adapter-rethinkdb`](packages/rethinkdb/README.md)   | RethinkDB documents                   | `rethinkdb-ts`                                                |
+| Package                                                               | Sink                                  | Client                                                        |
+| --------------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------- |
+| [`error-log-adapter-rabbitmq`](packages/rabbitmq/README.md)           | A RabbitMQ exchange or queue          | `amqplib`                                                     |
+| [`error-log-adapter-nats`](packages/nats/README.md)                   | A NATS subject, or a JetStream stream | `nats`                                                        |
+| [`error-log-adapter-clickhouse`](packages/clickhouse/README.md)       | A ClickHouse table                    | `@clickhouse/client`                                          |
+| [`error-log-adapter-influxdb`](packages/influxdb/README.md)           | InfluxDB 2.x or 3 points              | `@influxdata/influxdb-client`, `@influxdata/influxdb3-client` |
+| [`error-log-adapter-couchdb`](packages/couchdb/README.md)             | CouchDB documents                     | `nano`                                                        |
+| [`error-log-adapter-arangodb`](packages/arangodb/README.md)           | ArangoDB documents                    | `arangojs`                                                    |
+| [`error-log-adapter-cassandra`](packages/cassandra/README.md)         | A Cassandra / ScyllaDB table          | `cassandra-driver`                                            |
+| [`error-log-adapter-neo4j`](packages/neo4j/README.md)                 | `:ErrorLog` nodes in Neo4j            | `neo4j-driver`                                                |
+| [`error-log-adapter-memcached`](packages/memcached/README.md)         | Recent errors in Memcached            | `memjs`                                                       |
+| [`error-log-adapter-rethinkdb`](packages/rethinkdb/README.md)         | RethinkDB documents                   | `rethinkdb-ts`                                                |
+| [`error-log-adapter-google-sheets`](packages/google-sheets/README.md) | Rows in a Google Sheets tab           | `@googleapis/sheets`                                          |
 
 ```bash
 npm install @richardmcquiston01/error-log-adapter @richardmcquiston01/error-log-adapter-rabbitmq amqplib
