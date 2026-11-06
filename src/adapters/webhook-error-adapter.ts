@@ -2,6 +2,7 @@ import { backoffDelayMs } from '../backoff.js';
 import { DEFAULT_PREFIX } from '../fail.js';
 import { hasCallerId, resolveEntryId } from '../entry-id.js';
 import { describeError, serializeEntry } from '../serialize.js';
+import type { WebhookBodyFormatter } from './webhook-formatters.js';
 import { resolveTimeoutMs, timeoutMessage } from '../timeout.js';
 import type {
   ErrorLogAdapter,
@@ -52,6 +53,18 @@ export interface WebhookErrorOptions {
    * `log()` fails rather than sending an unsigned entry.
    */
   signingSecret?: string;
+  /**
+   * Builds the request body instead of sending the entry's own JSON, for a
+   * receiver that expects a particular shape, such as a Slack, Google Chat,
+   * Discord or Teams incoming webhook (see `formatSlackBody` and the others).
+   * It gets the entries in the request: one for `log`, all of them for
+   * `logBatch`, so a batch can become one message instead of a JSON array. The
+   * body is not given an `id`, because a chat service cannot use one. Retries,
+   * timeouts, the `https://` rule and `signingSecret` all still apply. If it
+   * throws, or returns something JSON cannot hold, `log` returns `ok: false`
+   * and nothing is sent.
+   */
+  formatBody?: WebhookBodyFormatter;
 }
 
 const DEFAULT_RETRY_DELAY_MS = 500;
@@ -212,6 +225,14 @@ export class WebhookErrorAdapter<
       retryDelayMs: this.retryDelayMs,
       maxRetryDelayMs: this.maxRetryDelayMs,
     } = validateRetryOptions(options));
+    if (
+      options.formatBody !== undefined &&
+      typeof options.formatBody !== 'function'
+    ) {
+      throw new RangeError(
+        `WebhookErrorAdapter: formatBody must be a function, received ${typeof options.formatBody}.`
+      );
+    }
     this.target = parseWebhookUrl(url, options.allowInsecure ?? false).origin;
   }
 
@@ -220,11 +241,14 @@ export class WebhookErrorAdapter<
     try {
       // A caller-supplied id goes along so the receiver can drop a repeat; a
       // retry can repeat too, so it gets one as well.
-      body = JSON.stringify(
-        hasCallerId(entry) || this.retries > 0
-          ? { id: resolveEntryId(entry), ...serializeEntry(entry) }
-          : serializeEntry(entry)
-      );
+      body =
+        this.options.formatBody !== undefined
+          ? this.formatted([entry])
+          : JSON.stringify(
+              hasCallerId(entry) || this.retries > 0
+                ? { id: resolveEntryId(entry), ...serializeEntry(entry) }
+                : serializeEntry(entry)
+            );
     } catch (error: unknown) {
       console.error(`${this.prefix} WebhookErrorAdapter:`, error);
       return this.fail(
@@ -247,12 +271,15 @@ export class WebhookErrorAdapter<
     }
     let body: string;
     try {
-      body = JSON.stringify(
-        entries.map((entry: ErrorLogEntry<TCode>) => ({
-          id: resolveEntryId(entry),
-          ...serializeEntry(entry),
-        }))
-      );
+      body =
+        this.options.formatBody !== undefined
+          ? this.formatted(entries)
+          : JSON.stringify(
+              entries.map((entry: ErrorLogEntry<TCode>) => ({
+                id: resolveEntryId(entry),
+                ...serializeEntry(entry),
+              }))
+            );
     } catch (error: unknown) {
       console.error(`${this.prefix} WebhookErrorAdapter:`, error);
       return this.fail(
@@ -260,6 +287,18 @@ export class WebhookErrorAdapter<
       );
     }
     return this.deliver(body);
+  }
+
+  /** The body `formatBody` makes for these entries, as JSON text. */
+  private formatted(entries: ErrorLogEntry<TCode>[]): string {
+    const formatBody = this.options.formatBody as WebhookBodyFormatter;
+    const json: string | undefined = JSON.stringify(formatBody(entries));
+    if (json === undefined) {
+      throw new TypeError(
+        'formatBody returned a value JSON cannot hold (undefined, a function or a symbol)'
+      );
+    }
+    return json;
   }
 
   /** Sends one prepared body, trying again as `retries` allows. */
