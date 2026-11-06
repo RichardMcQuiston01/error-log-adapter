@@ -630,4 +630,188 @@ describe('WebhookErrorAdapter', () => {
       expect(headers['X-Signature-256']).toBe(`sha256=${expected}`);
     });
   });
+
+  describe('formatBody', () => {
+    const slackBody = (entries: ErrorLogEntry[]): { text: string } => ({
+      text: entries
+        .map((entry: ErrorLogEntry): string => entry.message)
+        .join(' | '),
+    });
+
+    function sentBodies(mockFetch: ReturnType<typeof vi.fn>): string[] {
+      return mockFetch.mock.calls.map(
+        (call: unknown[]): string => (call[1] as RequestInit).body as string
+      );
+    }
+
+    it('sends what the formatter returns instead of the entry', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+      vi.stubGlobal('fetch', mockFetch);
+
+      const result = await new WebhookErrorAdapter('https://example.com/hook', {
+        formatBody: slackBody,
+      }).log(ENTRY);
+
+      expect(result).toEqual({ ok: true });
+      expect(sentBodies(mockFetch)).toEqual([
+        JSON.stringify({ text: 'something went wrong' }),
+      ]);
+      const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+      expect((init.headers as Record<string, string>)['Content-Type']).toBe(
+        'application/json'
+      );
+    });
+
+    it('gives the formatter the entry as logged, with its cause', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, status: 200 })
+      );
+      const formatBody = vi.fn().mockReturnValue({ ok: 1 });
+      const cause = new Error('root');
+
+      await new WebhookErrorAdapter('https://example.com/hook', {
+        formatBody,
+      }).log({ ...ENTRY, cause });
+
+      expect(formatBody).toHaveBeenCalledTimes(1);
+      expect(formatBody).toHaveBeenCalledWith([{ ...ENTRY, cause }]);
+    });
+
+    it('sends a whole batch as one formatted body, not a JSON array', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+      vi.stubGlobal('fetch', mockFetch);
+      const adapter = new WebhookErrorAdapter('https://example.com/hook', {
+        formatBody: slackBody,
+      });
+
+      const result = await adapter.logBatch([
+        ENTRY,
+        { ...ENTRY, message: 'second' },
+      ]);
+
+      expect(result).toEqual({ ok: true });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(sentBodies(mockFetch)).toEqual([
+        JSON.stringify({ text: 'something went wrong | second' }),
+      ]);
+    });
+
+    it('sends nothing for an empty batch', async () => {
+      const mockFetch = vi.fn();
+      vi.stubGlobal('fetch', mockFetch);
+
+      const result = await new WebhookErrorAdapter('https://example.com/hook', {
+        formatBody: slackBody,
+      }).logBatch([]);
+
+      expect(result).toEqual({ ok: true });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('adds no id, even when retries are on', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+      vi.stubGlobal('fetch', mockFetch);
+
+      await new WebhookErrorAdapter('https://example.com/hook', {
+        formatBody: slackBody,
+        retries: 2,
+      }).log(ENTRY);
+
+      expect(sentBodies(mockFetch)[0]).not.toContain('"id"');
+    });
+
+    it('sends the same formatted body again on a retry', async () => {
+      vi.useFakeTimers();
+      try {
+        const mockFetch = vi
+          .fn()
+          .mockResolvedValueOnce({
+            ok: false,
+            status: 429,
+            headers: new Headers({ 'retry-after': '1' }),
+          })
+          .mockResolvedValueOnce({ ok: true, status: 200 });
+        vi.stubGlobal('fetch', mockFetch);
+        const formatBody = vi.fn().mockReturnValue({ text: 'once' });
+
+        const pending = new WebhookErrorAdapter('https://example.com/hook', {
+          formatBody,
+          retries: 1,
+        }).log(ENTRY);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(await pending).toEqual({ ok: true });
+        expect(sentBodies(mockFetch)).toEqual([
+          JSON.stringify({ text: 'once' }),
+          JSON.stringify({ text: 'once' }),
+        ]);
+        expect(formatBody).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('signs the formatted body', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+      vi.stubGlobal('fetch', mockFetch);
+
+      await new WebhookErrorAdapter('https://example.com/hook', {
+        formatBody: slackBody,
+        signingSecret: 'shh',
+      }).log(ENTRY);
+
+      const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+      const headers = init.headers as Record<string, string>;
+      const expected: string = createHmac('sha256', 'shh')
+        .update(`${headers['X-Signature-Timestamp']}.${init.body as string}`)
+        .digest('hex');
+      expect(headers['X-Signature-256']).toBe(`sha256=${expected}`);
+    });
+
+    it('returns ok: false and sends nothing when the formatter throws', async () => {
+      const mockFetch = vi.fn();
+      vi.stubGlobal('fetch', mockFetch);
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const result = await new WebhookErrorAdapter('https://example.com/hook', {
+        formatBody: (): never => {
+          throw new Error('template is broken');
+        },
+      }).log(ENTRY);
+
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('could not prepare the entry');
+      expect(result.error).toContain('template is broken');
+      expect(mockFetch).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it('returns ok: false when the formatter returns nothing JSON can hold', async () => {
+      const mockFetch = vi.fn();
+      vi.stubGlobal('fetch', mockFetch);
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const result = await new WebhookErrorAdapter('https://example.com/hook', {
+        formatBody: (): undefined => undefined,
+      }).logBatch([ENTRY]);
+
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('could not prepare the entries');
+      expect(result.error).toContain(
+        'formatBody returned a value JSON cannot hold'
+      );
+      expect(mockFetch).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it('rejects a formatBody that is not a function', () => {
+      expect(
+        () =>
+          new WebhookErrorAdapter('https://example.com/hook', {
+            formatBody: 'nope' as unknown as () => unknown,
+          })
+      ).toThrow('formatBody must be a function, received string');
+    });
+  });
 });

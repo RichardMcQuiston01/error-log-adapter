@@ -27,7 +27,7 @@ Throwing is allowed in exactly one place: the **constructor**, for options that 
 
 ## A first adapter
 
-This posts each error to a Slack incoming webhook:
+This posts each error to a Slack incoming webhook. (For Slack, Google Chat, Discord or Teams you do not need to write this: `WebhookErrorAdapter` with `formatBody: formatSlackBody` does the same, plus retries, timeouts and escaping. It is shown here because it is a short example of the contract.)
 
 ```ts
 import {

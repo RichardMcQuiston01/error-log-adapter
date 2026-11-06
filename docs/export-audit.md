@@ -53,14 +53,15 @@ An adapter whose only evidence is a fake client it was written against is Experi
 
 ## Other value exports
 
-| Export                                               | README or docs | Proposed                        | Why                                                         |
-| ---------------------------------------------------- | -------------- | ------------------------------- | ----------------------------------------------------------- |
-| `serializeEntry`, `serializeCause`                   | Yes            | Stable                          | The record shape every adapter stores                       |
-| `createErrorLogStore`                                | Yes            | Same as `IndexedDbErrorAdapter` | Sets up the IndexedDB store                                 |
-| `buildCreateErrorLogTableSql`                        | Yes            | Same as `SqliteErrorAdapter`    | SQLite table setup                                          |
-| `buildErrorLogTableDdl`, `buildMySqlWidenColumnsSql` | Yes            | Same as the SQL adapters        | Table setup and migration                                   |
-| `buildSupabaseSetupSql`                              | Yes            | Same as `SupabaseErrorAdapter`  | Table setup                                                 |
-| `formatErrorLogLine`                                 | No. One test   | Internal                        | How the flat file writes a line. No outside caller needs it |
+| Export                                                                            | README or docs | Proposed                        | Why                                                                                     |
+| --------------------------------------------------------------------------------- | -------------- | ------------------------------- | --------------------------------------------------------------------------------------- |
+| `serializeEntry`, `serializeCause`                                                | Yes            | Stable                          | The record shape every adapter stores                                                   |
+| `createErrorLogStore`                                                             | Yes            | Same as `IndexedDbErrorAdapter` | Sets up the IndexedDB store                                                             |
+| `buildCreateErrorLogTableSql`                                                     | Yes            | Same as `SqliteErrorAdapter`    | SQLite table setup                                                                      |
+| `buildErrorLogTableDdl`, `buildMySqlWidenColumnsSql`                              | Yes            | Same as the SQL adapters        | Table setup and migration                                                               |
+| `buildSupabaseSetupSql`                                                           | Yes            | Same as `SupabaseErrorAdapter`  | Table setup                                                                             |
+| `formatSlackBody`, `formatGoogleChatBody`, `formatDiscordBody`, `formatTeamsBody` | Yes            | Experimental                    | Message shapes follow each service's docs; no live webhook run yet (opt-in test exists) |
+| `formatErrorLogLine`                                                              | No. One test   | Internal                        | How the flat file writes a line. No outside caller needs it                             |
 
 **A naming inconsistency to settle before 1.0.** SQLite's setup function is `buildCreateErrorLogTableSql` and the others' is `buildErrorLogTableDdl`. They do the same job under two naming patterns. Renaming one is breaking, which is fine in 0.x. **Decision needed.**
 
