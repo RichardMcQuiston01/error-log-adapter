@@ -105,7 +105,7 @@ Google's own text is kept in the message too.
 ## What was checked
 
 - Unit tests with a fake client (rows, quoting of tab names, the cell limit, the header, batching with `BatchingErrorAdapter`, the failure messages and timeouts), and a compile-time check that the real `@googleapis/sheets` client type fits `SheetsClientLike`.
-- **Not run against a real spreadsheet yet.** An opt-in live test (`google-sheets-error-adapter.live.test.ts`) is included: set `GOOGLE_SHEETS_TEST_SPREADSHEET_ID` and `GOOGLE_APPLICATION_CREDENTIALS` (see the top of that file) and run `bun run test:live`. It adds a temporary tab for each check and deletes it afterwards.
+- An opt-in live test (`google-sheets-error-adapter.live.test.ts`) ran against a real spreadsheet with a service account (Node 22, `@googleapis/sheets` 18), and all eight checks pass: the header written on an empty tab and a custom header left alone, one row per entry, text starting with `=` stored as text, a batch appended in one request in order, five entries logged at the same time, a 100,000-character cause cut to the cell limit, and a missing tab and a missing spreadsheet coming back as `ok: false` with the hint. To run it yourself, set `GOOGLE_SHEETS_TEST_SPREADSHEET_ID` and `GOOGLE_APPLICATION_CREDENTIALS` (see the top of that file) and run `bunx vitest run packages/google-sheets/src/google-sheets-error-adapter.live.test.ts`. It adds a temporary tab for each check and deletes it afterwards.
 - Not tested: OAuth user credentials (only a service account was in mind), very large batches, shared drives, and spreadsheets with protected ranges.
 
 ## Compatibility
