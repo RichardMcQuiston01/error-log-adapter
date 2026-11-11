@@ -43,11 +43,11 @@ Planned adapters, in priority order.
   - `@richardmcquiston01/error-log-adapter-neo4j` 0.1.0: `:ErrorLog` nodes, `MERGE` on the entry id so retries never duplicate
   - `@richardmcquiston01/error-log-adapter-memcached` 0.1.0: recent errors as expiring entries plus a fixed-size recent list
   - `@richardmcquiston01/error-log-adapter-rethinkdb` 0.1.0: documents keyed by entry id, native times, a retry keeps the first write
+  - `@richardmcquiston01/error-log-adapter-google-sheets` 0.1.0: rows in a Google Sheets tab, one append request per batch, values stored as raw text
 - Batching wrapper: `BatchingErrorAdapter` queues, batches and retries in front of any adapter; the webhook adds `logBatch` (one request, JSON array)
 
 ## Next Up
 
-- `@richardmcquiston01/error-log-adapter-google-sheets` 0.1.0: rows in a Google Sheets tab, one request per batch. Written, tested with a fake client, and its live test passes against a real spreadsheet; ready to release.
 - OrientDB is not planned.
 
 ## Cross-Cutting Work
