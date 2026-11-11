@@ -260,12 +260,16 @@ export class GoogleSheetsErrorAdapter<
   }
 
   private failed(action: string, error: unknown): ErrorLogResult {
+    const reason: string = describeSheetsError(error, this.sheetName);
     return reportFailure({
       adapterName: 'GoogleSheetsErrorAdapter',
       prefix: this.logPrefix,
       action,
-      error,
-      reason: describeSheetsError(error, this.sheetName),
+      // An error from Google carries the whole request (the URL with the
+      // spreadsheet ID, and the row being written) and prints a page long, so the
+      // console gets the short reason instead. Other errors are printed as they are.
+      error: statusOf(error) === undefined ? error : reason,
+      reason,
     });
   }
 

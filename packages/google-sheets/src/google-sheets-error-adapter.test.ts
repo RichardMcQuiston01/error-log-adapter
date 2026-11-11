@@ -440,6 +440,52 @@ describe('GoogleSheetsErrorAdapter', () => {
     });
   });
 
+  describe('console output', () => {
+    it('prints one short line for an error from Google, not the request it carries', async () => {
+      const googleError = Object.assign(
+        new Error('Requested entity was not found.'),
+        {
+          code: 404,
+          config: {
+            url: `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/x:append`,
+            body: '{"values":[["a secret row"]]}',
+          },
+          response: { status: 404 },
+        }
+      );
+      const { client } = fakeClient({
+        append: () => Promise.reject(googleError),
+      });
+
+      const result = await new GoogleSheetsErrorAdapter(
+        client,
+        SPREADSHEET_ID
+      ).log(entry);
+
+      const printed: unknown[] = (console.error as ReturnType<typeof vi.fn>)
+        .mock.calls[0] as unknown[];
+      expect(printed[0]).toBe('[error-log-adapter] GoogleSheetsErrorAdapter:');
+      expect(typeof printed[1]).toBe('string');
+      expect(printed[1]).toContain('Requested entity was not found.');
+      expect(printed[1]).toContain('check the spreadsheet ID');
+      expect(String(printed[1])).not.toContain(SPREADSHEET_ID);
+      expect(String(printed[1])).not.toContain('a secret row');
+      expect(result.error).toContain('Requested entity was not found.');
+    });
+
+    it('prints any other error as it is, with its stack', async () => {
+      const failure = new Error('socket hang up');
+      const { client } = fakeClient({ append: () => Promise.reject(failure) });
+
+      await new GoogleSheetsErrorAdapter(client, SPREADSHEET_ID).log(entry);
+
+      expect(console.error).toHaveBeenCalledWith(
+        '[error-log-adapter] GoogleSheetsErrorAdapter:',
+        failure
+      );
+    });
+  });
+
   describe('failure hints', () => {
     async function failureFor(error: unknown): Promise<string> {
       const { client } = fakeClient({
