@@ -15,6 +15,12 @@
 - `packages/arangodb`: an opt-in live test, run against ArangoDB 3.12 and 3.11 servers in Docker (all seven checks pass). It is skipped unless `ARANGODB_TEST_URL` is set.
 - `packages/neo4j`: an opt-in live test, run against Neo4j 5 and 4.4 servers in Docker (all five checks pass). It is skipped unless `NEO4J_TEST_URL` is set.
 
+## google-sheets-v0.1.0
+
+### Added
+
+- `packages/google-sheets`: `@richardmcquiston01/error-log-adapter-google-sheets` (0.1.0, not yet released). `GoogleSheetsErrorAdapter(client, spreadsheetId)` appends each entry as a row (`id`, `occurred_at`, `code`, `message`, `source`, `cause`) to a tab of a Google Sheets spreadsheet through the official client (`@googleapis/sheets`). Values are sent as `RAW`, so text that starts with `=` is never run as a formula, and a cell is cut to Sheets' 50,000-character limit. `logBatch` appends a whole batch in one request, which fits Sheets' write quota of about 60 per minute with `BatchingErrorAdapter`. `writeHeader` writes the column names into an empty first row. A 429, 403, 404 or missing-tab failure says what to do. A failure from Google prints one short line to the console instead of the whole request (URL, spreadsheet ID and row). Tested with a fake client and a compile-time check against the real client type, and with an opt-in live test run against a real spreadsheet with a service account (all eight checks pass).
+
 ## 0.16.0
 
 ### Added
