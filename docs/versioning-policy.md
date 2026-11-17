@@ -4,6 +4,8 @@
 
 This page says what you can rely on from 1.0.0 onward. Every export is labeled Stable or Experimental in the [export audit](export-audit.md).
 
+It covers the core package and the adapter packages under `packages/` (for example `@richardmcquiston01/error-log-adapter-rabbitmq`). Each is versioned on its own and follows the same rules, and the core's `/kit` entry point is public for them.
+
 ## What is public
 
 A change to any of these that could break working code is a breaking change.
@@ -19,7 +21,7 @@ Not public, and free to change in any release: anything not exported, the text o
 
 ## Experimental
 
-An export tagged `@experimental` in the type definitions is **not covered** by the rules on this page. It may change in a minor release, and the changelog says so under the release that changes it. At 1.0.0 nothing is tagged.
+An export tagged `@experimental` in the type definitions is **not covered** by the rules on this page. It may change in a minor release, and the changelog says so under the release that changes it. The `/kit` entry point is tagged until the export audit's decision on it is made; once it is Stable, nothing is tagged.
 
 An adapter is Stable when either of these holds, and a new adapter starts as Experimental until it does:
 
