@@ -1,6 +1,6 @@
 # Export audit (1.0 readiness)
 
-Every export of `@richardmcquiston01/error-log-adapter`, with a proposed label for 1.0. The package has one entry point (`.`), so the labels apply to names, not to subpaths.
+Every export of `@richardmcquiston01/error-log-adapter`, with a proposed label for 1.0. The core package has two entry points: `.` (the adapters) and `/kit` (helpers for adapter packages). The adapter packages under `packages/` are covered in the update near the end.
 
 - **Stable:** covered by semver from 1.0. A breaking change needs a new major version.
 - **Experimental:** exported and documented as experimental. It may change in a minor release, and the changelog says so. It moves to Stable once it meets the rule below.
@@ -72,6 +72,34 @@ An adapter whose only evidence is a fake client it was written against is Experi
 - **Structural client types** (`CollectionLike`, `SqlClientLike`, `S3ClientLike`, `FileSystemLike` and the other `...Like` types): the contract with each driver. Keep them exported. They carry the label of their adapter. One rule goes into the policy: adding a required member to a `...Like` type is a breaking change.
 - **`BatchCapableAdapter`:** Stable. It is the documented way to add `logBatch` to a custom adapter.
 
+## Update: adapter packages and `/kit` (2026-11-17)
+
+Since 0.15 the repository holds a core package and 11 adapter packages under `packages/`, each published and versioned on its own (`<name>-v<version>` tags, see [releasing](releasing.md)). The core stays dependency-free. They are judged by the same rule as the core adapters. This is a proposal until it is approved.
+
+**All 11 meet rule 2.** Each takes a client described by a `...Like` interface, lists the real driver as a dev dependency, and has a test that `tsc --noEmit` and the unit run compile against the real client (`real-driver-types.test.ts`, or `real-arangojs.test.ts`, `real-nano.test.ts` and `real-clients.test.ts` where the test also drives the real client). Each also has an opt-in live test against the real service (`*.live.test.ts`). CI never starts a server for any of them, which is also true of the core adapters.
+
+| Package          | Version | Real client checked in CI                                                         | Live test | Proposed |
+| ---------------- | ------- | --------------------------------------------------------------------------------- | --------- | -------- |
+| `-arangodb`      | 0.1.0   | `arangojs`                                                                        | Yes       | Stable   |
+| `-cassandra`     | 0.1.0   | `cassandra-driver`                                                                | Yes       | Stable   |
+| `-clickhouse`    | 0.1.0   | `@clickhouse/client`                                                              | Yes       | Stable   |
+| `-couchdb`       | 0.1.0   | `nano`                                                                            | Yes       | Stable   |
+| `-google-sheets` | 0.1.0   | `@googleapis/sheets`                                                              | Yes       | Stable   |
+| `-influxdb`      | 0.1.0   | `@influxdata/influxdb-client` and `influxdb3-client`, against a local stub server | Yes       | Stable   |
+| `-memcached`     | 0.1.0   | `memjs`                                                                           | Yes       | Stable   |
+| `-nats`          | 0.1.1   | `nats`                                                                            | Yes       | Stable   |
+| `-neo4j`         | 0.1.0   | `neo4j-driver`                                                                    | Yes       | Stable   |
+| `-rabbitmq`      | 0.1.0   | `amqplib`                                                                         | Yes       | Stable   |
+| `-rethinkdb`     | 0.1.0   | `rethinkdb-ts`                                                                    | Yes       | Stable   |
+
+**A difference from `storage-adapters`.** That package also requires the conformance suite to run against the real server in CI, so it keeps `/gcs`, `/google-drive` and `/google-sheets` Experimental. This package's rule is type fit, which Google Sheets meets. The type fit does not show that the adapter works against the live service; the live tests do, and they are run by hand.
+
+**`/kit`.** It is Experimental "until the first adapter packages have shipped against it". Eleven have. **Proposed: Stable at 1.0.0.** Every package depends on it through the core's peer range, so a breaking change to `/kit` after 1.0 would break all of them. Its exports are the helpers the core adapters use (`reportFailure`, `withTimeout`, `resolveEntryId`, `generateId`, `describeError`, `backoffDelayMs`, `SerialQueue` and their types). If you would rather keep some of them private, decide before 1.0.
+
+**Versions and peer ranges.** Every package declares the core as a peer dependency at `>=0.15.0`. That range has no upper bound and would accept a future 2.0. Proposed: release the core 1.0.0 first, then release each package as 1.0.0 with a peer range of `^1.0.0`. A package whose peer range still says `>=0.15.0` would claim to work with a core it was never tested against.
+
+**What is not covered.** The packages are one to two weeks old and unused outside this repository, as were the first 14 core adapters.
+
 ## Findings
 
 1. **The contract is ready to freeze.** One optional field in fourteen releases.
@@ -83,7 +111,10 @@ An adapter whose only evidence is a fake client it was written against is Experi
 ## Decisions needed
 
 1. Approve the Stable and Experimental split.
-2. Promote the nine Experimental adapters before 1.0 by adding real-driver type tests, or ship them as Experimental?
+2. ~~Promote the nine Experimental adapters before 1.0 by adding real-driver type tests, or ship them as Experimental?~~ **Decided:** promoted; the type tests were added.
 3. ~~Is the conditional `node:sqlite` test enough for `SqliteErrorAdapter` to be Stable?~~ **Decided:** yes, the conditional test is enough.
-4. Remove `formatErrorLogLine` in the next minor?
+4. ~~Remove `formatErrorLogLine` in the next minor?~~ **Decided:** removed.
 5. Rename one of the two SQL setup functions so they match?
+6. Graduate `/kit` to Stable at 1.0.0, or keep it Experimental and keep the adapter packages on 0.x?
+7. Take the 11 adapter packages to 1.0.0 together with the core, with a `^1.0.0` core peer range?
+8. Treat type fit as enough for `-google-sheets` (this repository's rule), although `storage-adapters` keeps its Sheets adapter Experimental?

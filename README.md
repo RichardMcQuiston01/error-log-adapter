@@ -413,7 +413,7 @@ Releases are published to npm by the `Publish` GitHub Action when a GitHub relea
 
 ## Stability
 
-From 1.0.0 the package follows [Semantic Versioning](https://semver.org/): the `ErrorLogAdapter` contract, every adapter, the setup helpers and the `...Like` client types change in a breaking way only in a major version. Anything tagged `@experimental` may change in a minor release. See [Versioning, support and deprecation](docs/versioning-policy.md) and [SECURITY.md](SECURITY.md).
+From 1.0.0 the package follows [Semantic Versioning](https://semver.org/): the `ErrorLogAdapter` contract, every adapter, the setup helpers and the `...Like` client types change in a breaking way only in a major version. The adapter packages under `packages/` follow the same rules. Anything tagged `@experimental` may change in a minor release. See [Versioning, support and deprecation](docs/versioning-policy.md) and [SECURITY.md](SECURITY.md).
 
 [Back to Top](#table-of-contents)
 
