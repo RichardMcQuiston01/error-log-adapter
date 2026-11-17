@@ -33,7 +33,7 @@ function assertValidTableName(tableName: string): void {
  * Returns the statements that create the error log table and its index.
  * Use this to run your own migration when `createTable` is disabled.
  */
-export function buildCreateErrorLogTableSql(
+export function buildSqliteErrorLogTableDdl(
   tableName: string = DEFAULT_TABLE_NAME
 ): string[] {
   assertValidTableName(tableName);
@@ -71,7 +71,7 @@ export class SqliteErrorAdapter<
   }
 
   protected createStatements(): string[] {
-    return buildCreateErrorLogTableSql(this.tableName);
+    return buildSqliteErrorLogTableDdl(this.tableName);
   }
 
   protected callDriver(sql: string, params: unknown[]): unknown {

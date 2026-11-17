@@ -11,7 +11,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import type { ErrorLogEntry } from '../types.js';
 import {
   SqliteErrorAdapter,
-  buildCreateErrorLogTableSql,
+  buildSqliteErrorLogTableDdl,
 } from './sqlite-error-adapter.js';
 import type { SqliteClientLike } from './sqlite-error-adapter.js';
 
@@ -173,9 +173,9 @@ describe.skipIf(sqlite === undefined)(
       expect(rows(db, 'app_errors')).toHaveLength(1);
     });
 
-    it('works with a table made from buildCreateErrorLogTableSql and createTable off', async () => {
+    it('works with a table made from buildSqliteErrorLogTableDdl and createTable off', async () => {
       const { db, client } = newDatabase();
-      for (const statement of buildCreateErrorLogTableSql('own_ddl')) {
+      for (const statement of buildSqliteErrorLogTableDdl('own_ddl')) {
         db.exec(statement);
       }
       const adapter = new SqliteErrorAdapter(client, {
