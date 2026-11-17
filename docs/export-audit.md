@@ -63,7 +63,7 @@ An adapter whose only evidence is a fake client it was written against is Experi
 | `formatSlackBody`, `formatGoogleChatBody`, `formatDiscordBody`, `formatTeamsBody` | Yes            | Experimental                    | Message shapes follow each service's docs; no live webhook run yet (opt-in test exists) |
 | `formatErrorLogLine`                                                              | No. One test   | Internal                        | How the flat file writes a line. No outside caller needs it                             |
 
-**Decided (2026-11-17): renamed.** SQLite's setup function is now `buildSqliteErrorLogTableDdl`, matching `buildErrorLogTableDdl`, with no alias. The table row above, and the other tables, show the old name `buildCreateErrorLogTableSql`: SQLite's setup function was named under a different pattern from the others, which was breaking to fix and fine in 0.x.
+**Decided (2026-11-17): renamed.** SQLite's setup function is now `buildSqliteErrorLogTableDdl`, matching `buildErrorLogTableDdl`, with no alias. It was `buildCreateErrorLogTableSql`, which followed a different naming pattern from the others. Renaming it was breaking, which is fine in 0.x.
 
 ## Type exports
 
