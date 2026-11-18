@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Changed
+
+- `buildCreateErrorLogTableSql` is renamed `buildSqliteErrorLogTableDdl`, to match `buildErrorLogTableDdl`. There is no alias. **Breaking** for code that imported the old name; do this before 1.0.
+- The `/kit` entry point is no longer tagged `@experimental`. Eleven adapter packages ship against it, so it follows the semver rules in `docs/versioning-policy.md` from 1.0.0.
+
 ### Added
 
 - `packages/rethinkdb`: `@richardmcquiston01/error-log-adapter-rethinkdb` (0.1.0). `RethinkDbErrorAdapter(table, connection)` stores each entry as a document whose primary key is the entry id, through a `rethinkdb-ts` table, with `cause` as real JSON and `occurred_at` and `created_at` as RethinkDB's native time type (an `occurred_at` index answers "newest first"). Inserts keep the stored document when the key exists, so a retry never duplicates. RethinkDB reports a refused write as `errors > 0` in the result instead of throwing, so the adapter reads that count, and failures carry the driver's short reason instead of its message, which repeats the whole query and document. `logBatch` is one `insert` for `BatchingErrorAdapter`. Tested with a fake table, the real driver's types, and a live test against RethinkDB 2.4 in Docker.

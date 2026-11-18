@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ErrorLogEntry } from '../types.js';
 import {
   SqliteErrorAdapter,
-  buildCreateErrorLogTableSql,
+  buildSqliteErrorLogTableDdl,
 } from './sqlite-error-adapter.js';
 import type { SqliteClientLike } from './sqlite-error-adapter.js';
 
@@ -164,9 +164,9 @@ describe('SqliteErrorAdapter', () => {
   );
 });
 
-describe('buildCreateErrorLogTableSql', () => {
+describe('buildSqliteErrorLogTableDdl', () => {
   it('builds snake_case DDL with a text UUID key and timestamps', () => {
-    const [createTable, createIndex] = buildCreateErrorLogTableSql();
+    const [createTable, createIndex] = buildSqliteErrorLogTableDdl();
 
     expect(createTable).toContain('CREATE TABLE IF NOT EXISTS error_log');
     expect(createTable).toContain('id TEXT PRIMARY KEY NOT NULL');

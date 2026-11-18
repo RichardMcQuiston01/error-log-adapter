@@ -57,13 +57,13 @@ An adapter whose only evidence is a fake client it was written against is Experi
 | --------------------------------------------------------------------------------- | -------------- | ------------------------------- | --------------------------------------------------------------------------------------- |
 | `serializeEntry`, `serializeCause`                                                | Yes            | Stable                          | The record shape every adapter stores                                                   |
 | `createErrorLogStore`                                                             | Yes            | Same as `IndexedDbErrorAdapter` | Sets up the IndexedDB store                                                             |
-| `buildCreateErrorLogTableSql`                                                     | Yes            | Same as `SqliteErrorAdapter`    | SQLite table setup                                                                      |
+| `buildSqliteErrorLogTableDdl`                                                     | Yes            | Same as `SqliteErrorAdapter`    | SQLite table setup                                                                      |
 | `buildErrorLogTableDdl`, `buildMySqlWidenColumnsSql`                              | Yes            | Same as the SQL adapters        | Table setup and migration                                                               |
 | `buildSupabaseSetupSql`                                                           | Yes            | Same as `SupabaseErrorAdapter`  | Table setup                                                                             |
 | `formatSlackBody`, `formatGoogleChatBody`, `formatDiscordBody`, `formatTeamsBody` | Yes            | Experimental                    | Message shapes follow each service's docs; no live webhook run yet (opt-in test exists) |
 | `formatErrorLogLine`                                                              | No. One test   | Internal                        | How the flat file writes a line. No outside caller needs it                             |
 
-**A naming inconsistency to settle before 1.0.** SQLite's setup function is `buildCreateErrorLogTableSql` and the others' is `buildErrorLogTableDdl`. They do the same job under two naming patterns. Renaming one is breaking, which is fine in 0.x. **Decision needed.**
+**Decided (2026-11-17): renamed.** SQLite's setup function is now `buildSqliteErrorLogTableDdl`, matching `buildErrorLogTableDdl`, with no alias. It was `buildCreateErrorLogTableSql`, which followed a different naming pattern from the others. Renaming it was breaking, which is fine in 0.x.
 
 ## Type exports
 
@@ -114,7 +114,7 @@ Since 0.15 the repository holds a core package and 11 adapter packages under `pa
 2. ~~Promote the nine Experimental adapters before 1.0 by adding real-driver type tests, or ship them as Experimental?~~ **Decided:** promoted; the type tests were added.
 3. ~~Is the conditional `node:sqlite` test enough for `SqliteErrorAdapter` to be Stable?~~ **Decided:** yes, the conditional test is enough.
 4. ~~Remove `formatErrorLogLine` in the next minor?~~ **Decided:** removed.
-5. Rename one of the two SQL setup functions so they match?
-6. Graduate `/kit` to Stable at 1.0.0, or keep it Experimental and keep the adapter packages on 0.x?
-7. Take the 11 adapter packages to 1.0.0 together with the core, with a `^1.0.0` core peer range?
-8. Treat type fit as enough for `-google-sheets` (this repository's rule), although `storage-adapters` keeps its Sheets adapter Experimental?
+5. ~~Rename one of the two SQL setup functions so they match?~~ **Decided:** renamed to `buildSqliteErrorLogTableDdl`.
+6. ~~Graduate `/kit` to Stable at 1.0.0?~~ **Decided:** yes. The `@experimental` tag is removed and `/kit` is covered by the policy from 1.0.0.
+7. ~~Take the 11 adapter packages to 1.0.0 together with the core, with a `^1.0.0` core peer range?~~ **Decided:** yes, as a release step: the core first, then each package. The version and peer-range changes are made in the release pull requests, not here.
+8. ~~Treat type fit as enough for `-google-sheets`?~~ **Decided:** yes, under this repository's rule.
