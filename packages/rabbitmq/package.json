@@ -1,6 +1,6 @@
 {
   "name": "@richardmcquiston01/error-log-adapter-rabbitmq",
-  "version": "0.1.0",
+  "version": "1.0.0-rc.1",
   "description": "RabbitMQ (AMQP 0-9-1) adapter for @richardmcquiston01/error-log-adapter: publishes each error as a JSON message through an amqplib channel.",
   "license": "Apache-2.0",
   "author": "Richard McQuiston <richard.mcquiston01@gmail.com>",
@@ -45,7 +45,7 @@
     "prepack": "node -e \"require('fs').copyFileSync('../../LICENSE','LICENSE')\""
   },
   "peerDependencies": {
-    "@richardmcquiston01/error-log-adapter": ">=0.15.0"
+    "@richardmcquiston01/error-log-adapter": "^1.0.0-rc.1"
   },
   "devDependencies": {
     "@types/amqplib": "^0.10.7",

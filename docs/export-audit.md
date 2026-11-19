@@ -96,6 +96,8 @@ Since 0.15 the repository holds a core package and 11 adapter packages under `pa
 
 **`/kit`.** It is Experimental "until the first adapter packages have shipped against it". Eleven have. **Proposed: Stable at 1.0.0.** Every package depends on it through the core's peer range, so a breaking change to `/kit` after 1.0 would break all of them. Its exports are the helpers the core adapters use (`reportFailure`, `withTimeout`, `resolveEntryId`, `generateId`, `describeError`, `backoffDelayMs`, `SerialQueue` and their types). If you would rather keep some of them private, decide before 1.0.
 
+**Done in the release candidate (2026-11-19):** the core and all 11 packages are at `1.0.0-rc.1`, and each package's peer range is `^1.0.0-rc.1` (`^1.0.0` at 1.0.0). A range of `>=0.15.0` would not match a prerelease core, and the release script would refuse the package.
+
 **Versions and peer ranges.** Every package declares the core as a peer dependency at `>=0.15.0`. That range has no upper bound and would accept a future 2.0. Proposed: release the core 1.0.0 first, then release each package as 1.0.0 with a peer range of `^1.0.0`. A package whose peer range still says `>=0.15.0` would claim to work with a core it was never tested against.
 
 **What is not covered.** The packages are one to two weeks old and unused outside this repository, as were the first 14 core adapters.

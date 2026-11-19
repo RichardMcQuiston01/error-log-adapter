@@ -1,6 +1,10 @@
 # CHANGELOG
 
-## Unreleased
+## 1.0.0-rc.1
+
+First release candidate for 1.0.0, for the core package and the eleven adapter packages under `packages/` (`-arangodb`, `-cassandra`, `-clickhouse`, `-couchdb`, `-google-sheets`, `-influxdb`, `-memcached`, `-nats`, `-neo4j`, `-rabbitmq`, `-rethinkdb`), which all move to `1.0.0-rc.1`. It is published under the `next` npm tag, so `npm install` still gets 0.16.0 until 1.0.0. From 1.0.0 the package follows the rules in `docs/versioning-policy.md`; the release candidate is not covered by them and can change before 1.0.0.
+
+Each adapter package's peer range for the core changes from `>=0.15.0` to `^1.0.0-rc.1` (and becomes `^1.0.0` at 1.0.0), so a package never runs against a core it was not tested with.
 
 ### Changed
 
