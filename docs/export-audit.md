@@ -1,6 +1,6 @@
 # Export audit (1.0 readiness)
 
-Every export of `@richardmcquiston01/error-log-adapter`, with a proposed label for 1.0. The package has one entry point (`.`), so the labels apply to names, not to subpaths.
+Every export of `@richardmcquiston01/error-log-adapter`, with a proposed label for 1.0. The core package has two entry points: `.` (the adapters) and `/kit` (helpers for adapter packages). The adapter packages under `packages/` are covered in the update near the end.
 
 - **Stable:** covered by semver from 1.0. A breaking change needs a new major version.
 - **Experimental:** exported and documented as experimental. It may change in a minor release, and the changelog says so. It moves to Stable once it meets the rule below.
@@ -57,13 +57,13 @@ An adapter whose only evidence is a fake client it was written against is Experi
 | --------------------------------------------------------------------------------- | -------------- | ------------------------------- | --------------------------------------------------------------------------------------- |
 | `serializeEntry`, `serializeCause`                                                | Yes            | Stable                          | The record shape every adapter stores                                                   |
 | `createErrorLogStore`                                                             | Yes            | Same as `IndexedDbErrorAdapter` | Sets up the IndexedDB store                                                             |
-| `buildCreateErrorLogTableSql`                                                     | Yes            | Same as `SqliteErrorAdapter`    | SQLite table setup                                                                      |
+| `buildSqliteErrorLogTableDdl`                                                     | Yes            | Same as `SqliteErrorAdapter`    | SQLite table setup                                                                      |
 | `buildErrorLogTableDdl`, `buildMySqlWidenColumnsSql`                              | Yes            | Same as the SQL adapters        | Table setup and migration                                                               |
 | `buildSupabaseSetupSql`                                                           | Yes            | Same as `SupabaseErrorAdapter`  | Table setup                                                                             |
 | `formatSlackBody`, `formatGoogleChatBody`, `formatDiscordBody`, `formatTeamsBody` | Yes            | Experimental                    | Message shapes follow each service's docs; no live webhook run yet (opt-in test exists) |
 | `formatErrorLogLine`                                                              | No. One test   | Internal                        | How the flat file writes a line. No outside caller needs it                             |
 
-**A naming inconsistency to settle before 1.0.** SQLite's setup function is `buildCreateErrorLogTableSql` and the others' is `buildErrorLogTableDdl`. They do the same job under two naming patterns. Renaming one is breaking, which is fine in 0.x. **Decision needed.**
+**Decided (2026-11-17): renamed.** SQLite's setup function is now `buildSqliteErrorLogTableDdl`, matching `buildErrorLogTableDdl`, with no alias. It was `buildCreateErrorLogTableSql`, which followed a different naming pattern from the others. Renaming it was breaking, which is fine in 0.x.
 
 ## Type exports
 
@@ -71,6 +71,36 @@ An adapter whose only evidence is a fake client it was written against is Experi
 - **Option and record types** (`...Options`, `...Record`): Stable alongside the class that takes them.
 - **Structural client types** (`CollectionLike`, `SqlClientLike`, `S3ClientLike`, `FileSystemLike` and the other `...Like` types): the contract with each driver. Keep them exported. They carry the label of their adapter. One rule goes into the policy: adding a required member to a `...Like` type is a breaking change.
 - **`BatchCapableAdapter`:** Stable. It is the documented way to add `logBatch` to a custom adapter.
+
+## Update: adapter packages and `/kit` (2026-11-17)
+
+Since 0.15 the repository holds a core package and 11 adapter packages under `packages/`, each published and versioned on its own (`<name>-v<version>` tags, see [releasing](releasing.md)). The core stays dependency-free. They are judged by the same rule as the core adapters. This is a proposal until it is approved.
+
+**All 11 meet rule 2.** Each takes a client described by a `...Like` interface, lists the real driver as a dev dependency, and has a test that `tsc --noEmit` and the unit run compile against the real client (`real-driver-types.test.ts`, or `real-arangojs.test.ts`, `real-nano.test.ts` and `real-clients.test.ts` where the test also drives the real client). Each also has an opt-in live test against the real service (`*.live.test.ts`). CI never starts a server for any of them, which is also true of the core adapters.
+
+| Package          | Version | Real client checked in CI                                                         | Live test | Proposed |
+| ---------------- | ------- | --------------------------------------------------------------------------------- | --------- | -------- |
+| `-arangodb`      | 0.1.0   | `arangojs`                                                                        | Yes       | Stable   |
+| `-cassandra`     | 0.1.0   | `cassandra-driver`                                                                | Yes       | Stable   |
+| `-clickhouse`    | 0.1.0   | `@clickhouse/client`                                                              | Yes       | Stable   |
+| `-couchdb`       | 0.1.0   | `nano`                                                                            | Yes       | Stable   |
+| `-google-sheets` | 0.1.0   | `@googleapis/sheets`                                                              | Yes       | Stable   |
+| `-influxdb`      | 0.1.0   | `@influxdata/influxdb-client` and `influxdb3-client`, against a local stub server | Yes       | Stable   |
+| `-memcached`     | 0.1.0   | `memjs`                                                                           | Yes       | Stable   |
+| `-nats`          | 0.1.1   | `nats`                                                                            | Yes       | Stable   |
+| `-neo4j`         | 0.1.0   | `neo4j-driver`                                                                    | Yes       | Stable   |
+| `-rabbitmq`      | 0.1.0   | `amqplib`                                                                         | Yes       | Stable   |
+| `-rethinkdb`     | 0.1.0   | `rethinkdb-ts`                                                                    | Yes       | Stable   |
+
+**A difference from `storage-adapters`.** That package also requires the conformance suite to run against the real server in CI, so it keeps `/gcs`, `/google-drive` and `/google-sheets` Experimental. This package's rule is type fit, which Google Sheets meets. The type fit does not show that the adapter works against the live service; the live tests do, and they are run by hand.
+
+**`/kit`.** It is Experimental "until the first adapter packages have shipped against it". Eleven have. **Proposed: Stable at 1.0.0.** Every package depends on it through the core's peer range, so a breaking change to `/kit` after 1.0 would break all of them. Its exports are the helpers the core adapters use (`reportFailure`, `withTimeout`, `resolveEntryId`, `generateId`, `describeError`, `backoffDelayMs`, `SerialQueue` and their types). If you would rather keep some of them private, decide before 1.0.
+
+**Done in the release candidate (2026-11-19):** the core and all 11 packages are at `1.0.0-rc.1`, and each package's peer range is `^1.0.0-rc.1` (`^1.0.0` at 1.0.0). A range of `>=0.15.0` would not match a prerelease core, and the release script would refuse the package.
+
+**Versions and peer ranges.** Every package declares the core as a peer dependency at `>=0.15.0`. That range has no upper bound and would accept a future 2.0. Proposed: release the core 1.0.0 first, then release each package as 1.0.0 with a peer range of `^1.0.0`. A package whose peer range still says `>=0.15.0` would claim to work with a core it was never tested against.
+
+**What is not covered.** The packages are one to two weeks old and unused outside this repository, as were the first 14 core adapters.
 
 ## Findings
 
@@ -83,7 +113,10 @@ An adapter whose only evidence is a fake client it was written against is Experi
 ## Decisions needed
 
 1. Approve the Stable and Experimental split.
-2. Promote the nine Experimental adapters before 1.0 by adding real-driver type tests, or ship them as Experimental?
+2. ~~Promote the nine Experimental adapters before 1.0 by adding real-driver type tests, or ship them as Experimental?~~ **Decided:** promoted; the type tests were added.
 3. ~~Is the conditional `node:sqlite` test enough for `SqliteErrorAdapter` to be Stable?~~ **Decided:** yes, the conditional test is enough.
-4. Remove `formatErrorLogLine` in the next minor?
-5. Rename one of the two SQL setup functions so they match?
+4. ~~Remove `formatErrorLogLine` in the next minor?~~ **Decided:** removed.
+5. ~~Rename one of the two SQL setup functions so they match?~~ **Decided:** renamed to `buildSqliteErrorLogTableDdl`.
+6. ~~Graduate `/kit` to Stable at 1.0.0?~~ **Decided:** yes. The `@experimental` tag is removed and `/kit` is covered by the policy from 1.0.0.
+7. ~~Take the 11 adapter packages to 1.0.0 together with the core, with a `^1.0.0` core peer range?~~ **Decided:** yes, as a release step: the core first, then each package. The version and peer-range changes are made in the release pull requests, not here.
+8. ~~Treat type fit as enough for `-google-sheets`?~~ **Decided:** yes, under this repository's rule.

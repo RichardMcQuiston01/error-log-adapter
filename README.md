@@ -98,7 +98,7 @@ Every stored record has the same shape: a UUID `id`, `code`, `message`, `timesta
 
 What changes durability or size, by adapter:
 
-- **SQL adapters** (`createTable`): the table is created on first use by default. Set `createTable: false` and run the statements from `buildErrorLogTableDdl('postgres' | 'mysql')` (or `buildCreateErrorLogTableSql()` for SQLite) yourself if the application's database user should not change the schema. Table names are checked to be plain identifiers. A MySQL table made by 0.4.0 or earlier has `VARCHAR(255)` columns for `code` and `source`; run the statement from `buildMySqlWidenColumnsSql()` once to widen them.
+- **SQL adapters** (`createTable`): the table is created on first use by default. Set `createTable: false` and run the statements from `buildErrorLogTableDdl('postgres' | 'mysql')` (or `buildSqliteErrorLogTableDdl()` for SQLite) yourself if the application's database user should not change the schema. Table names are checked to be plain identifiers. A MySQL table made by 0.4.0 or earlier has `VARCHAR(255)` columns for `code` and `source`; run the statement from `buildMySqlWidenColumnsSql()` once to widen them.
 - **Supabase**: create the table once with `buildSupabaseSetupSql()`, which also turns on row level security. Log from a server with the service role key, which bypasses RLS and must never reach a browser. A browser-held key needs an insert policy: pass `insertRoles: ['authenticated']` to the same function. The policy limits the size of each field but cannot tie a row to a user, so a holder of that key can still add entries of their own. Listing `anon` or `public` throws unless you also pass `allowPublicInsert: true`, because the anon key is public.
 - **S3** (`batch`): with `batch: { batchSize, maxWaitMs }`, entries are buffered and uploaded together as one NDJSON object. `log()` then returns `ok` as soon as the entry is buffered, so call `flush()` before the process exits.
 - **Files** (`maxBytes` / `maxFiles`, `maxEntries`): the flat file adapter and the JSON file adapter's `ndjson` mode rotate by size: before a write that would push the file past `maxBytes`, `errors.log` becomes `errors.log.1` (older files shift up, and the one past `maxFiles`, default 3, is deleted). Every file holds whole lines, an entry is never split across files, and a failed rotation is reported to the console but the entry is still written. Rotation assumes one process writes the file. The JSON file adapter's `array` mode instead keeps the newest `maxEntries`, and rejects `maxBytes` / `maxFiles`.
@@ -413,7 +413,7 @@ Releases are published to npm by the `Publish` GitHub Action when a GitHub relea
 
 ## Stability
 
-From 1.0.0 the package follows [Semantic Versioning](https://semver.org/): the `ErrorLogAdapter` contract, every adapter, the setup helpers and the `...Like` client types change in a breaking way only in a major version. Anything tagged `@experimental` may change in a minor release. See [Versioning, support and deprecation](docs/versioning-policy.md) and [SECURITY.md](SECURITY.md).
+From 1.0.0 the package follows [Semantic Versioning](https://semver.org/): the `ErrorLogAdapter` contract, every adapter, the setup helpers and the `...Like` client types change in a breaking way only in a major version. The adapter packages under `packages/` follow the same rules. Anything tagged `@experimental` may change in a minor release. See [Versioning, support and deprecation](docs/versioning-policy.md) and [SECURITY.md](SECURITY.md).
 
 [Back to Top](#table-of-contents)
 

@@ -1,6 +1,6 @@
 {
   "name": "@richardmcquiston01/error-log-adapter-influxdb",
-  "version": "0.1.0",
+  "version": "1.0.0-rc.1",
   "description": "InfluxDB adapter for @richardmcquiston01/error-log-adapter: writes each error as a line-protocol point through the InfluxDB 2.x or 3.x client.",
   "license": "Apache-2.0",
   "author": "Richard McQuiston <richard.mcquiston01@gmail.com>",
@@ -44,7 +44,7 @@
     "prepack": "node -e \"require('fs').copyFileSync('../../LICENSE','LICENSE')\""
   },
   "peerDependencies": {
-    "@richardmcquiston01/error-log-adapter": ">=0.15.0"
+    "@richardmcquiston01/error-log-adapter": "^1.0.0-rc.1"
   },
   "devDependencies": {
     "@influxdata/influxdb-client": "^1.35.0",

@@ -4,13 +4,15 @@
 
 This page says what you can rely on from 1.0.0 onward. Every export is labeled Stable or Experimental in the [export audit](export-audit.md).
 
+It covers the core package and the adapter packages under `packages/` (for example `@richardmcquiston01/error-log-adapter-rabbitmq`). Each is versioned on its own and follows the same rules, and the core's `/kit` entry point is public for them.
+
 ## What is public
 
 A change to any of these that could break working code is a breaking change.
 
 - **The contract.** `ErrorLogAdapter`, `ErrorLogEntry`, `ErrorLogResult` and `SerializedErrorLogEntry`, and what they promise: `log` returns a `Promise<ErrorLogResult>` and does not throw, a failing sink is reported through the result, and `id` is optional on an entry.
 - **Every adapter export**, with its documented options, return values and behavior: `ConsoleErrorAdapter`, `CompositeErrorAdapter`, `BatchingErrorAdapter`, `EventEmitterErrorAdapter`, `FlatFileErrorAdapter`, `JsonFileErrorAdapter`, `SqliteErrorAdapter`, `MySqlErrorAdapter`, `PostgresErrorAdapter`, `WebhookErrorAdapter`, `MongoDbErrorAdapter`, `RedisErrorAdapter`, `S3ErrorAdapter`, `CloudWatchLogsErrorAdapter`, `SnsErrorAdapter`, `FirestoreErrorAdapter`, `RealtimeDatabaseErrorAdapter`, `SupabaseErrorAdapter`, `IndexedDbErrorAdapter`, `WebStorageErrorAdapter` and `WebSocketErrorAdapter`.
-- **The helpers**: `serializeEntry`, `serializeCause`, `createErrorLogStore`, `buildCreateErrorLogTableSql`, `buildErrorLogTableDdl`, `buildMySqlWidenColumnsSql` and `buildSupabaseSetupSql`.
+- **The helpers** and **the `/kit` entry point** (`reportFailure`, `withTimeout`, `resolveEntryId` and the other helpers adapter packages build on): `serializeEntry`, `serializeCause`, `createErrorLogStore`, `buildSqliteErrorLogTableDdl`, `buildErrorLogTableDdl`, `buildMySqlWidenColumnsSql` and `buildSupabaseSetupSql`.
 - **The structural client types**, such as `SqlClientLike`, `S3ClientLike` and `FileSystemLike`. They are the contract between an adapter and a client. Adding a required member to one is a breaking change, because code written against the old shape stops compiling. The real client's own type must keep fitting without a cast.
 - **`BatchCapableAdapter`**, the documented way to add `logBatch` to a custom adapter.
 - **Documented stored layouts.** Where the README describes what an adapter writes (the `error_log` table and its columns, the line format of `FlatFileErrorAdapter`, the NDJSON records, S3 object keys, Firestore document ids), a later release of the same major version still reads what an earlier one wrote. Changing a documented layout without a migration is breaking.
@@ -34,7 +36,7 @@ The package follows [Semantic Versioning](https://semver.org/).
 
 | Change                                                                                                                                                                                                                   | Example                                | Bumps     |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------- | --------- |
-| Removing or renaming a Stable export; changing behavior in a way that can break callers; adding a required member to a client type; changing a documented stored layout without migration; requiring a newer environment | renaming `buildCreateErrorLogTableSql` | **major** |
+| Removing or renaming a Stable export; changing behavior in a way that can break callers; adding a required member to a client type; changing a documented stored layout without migration; requiring a newer environment | renaming `buildSqliteErrorLogTableDdl` | **major** |
 | Adding an adapter, an option, or an optional member to a client type; adding a field to the stored record                                                                                                                | a new adapter                          | **minor** |
 | A bug fix, a documentation change, or an internal change                                                                                                                                                                 | fixing a retry that waited too long    | **patch** |
 

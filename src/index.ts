@@ -38,7 +38,7 @@ export type {
 } from './adapters/indexeddb-error-adapter.js';
 export {
   SqliteErrorAdapter,
-  buildCreateErrorLogTableSql,
+  buildSqliteErrorLogTableDdl,
 } from './adapters/sqlite-error-adapter.js';
 export type {
   SqliteClientLike,
